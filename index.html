@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magical Mirai 票务看板</title>
+    <title>Magical Mirai 交互式票务地图</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --miku: #39C5BB; --bg: #f4f7f6; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1300px; margin: 0 auto; }
         header { background: var(--miku); color: white; padding: 15px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
         
         .operator-bar { background: #e0f2f1; padding: 10px 15px; border-radius: 8px; margin: 15px 0; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
@@ -18,61 +18,62 @@
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
         
-        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .map-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .card-header h3 { margin: 0; }
-        .btn-img { background: #e0f2f1; color: #00796b; border: 1px solid #b2dfdb; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
+        .venues-container { display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px; }
+        .venue-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .venue-title { margin-top: 0; font-size: 1.1rem; color: #333; border-bottom: 2px solid var(--miku); padding-bottom: 5px; }
         
-        .stage { background: #333; color: white; text-align: center; padding: 6px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; margin-bottom: 12px; }
+        .stage { background: #444; color: white; text-align: center; padding: 8px; border-radius: 4px; font-weight: bold; font-size: 0.9rem; margin-bottom: 15px; }
         
-        .type-section { margin-top: 10px; border-top: 1px dashed #eee; padding-top: 6px; }
-        .type-title { font-size: 0.8rem; font-weight: bold; color: #555; margin-bottom: 6px; display: flex; justify-content: space-between; }
-        .seat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; min-height: 35px; }
-        
-        .seat-node { border-radius: 6px; padding: 8px; text-align: left; font-size: 0.75rem; color: white; cursor: pointer; transition: transform 0.1s; }
-        .seat-node:active { transform: scale(0.96); }
-        .seat-node .seat-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 2px; }
-        .seat-node .seat-sub { font-size: 0.7rem; opacity: 0.9; }
-        
-        .status-在手 { background-color: #2ec4b6; }
-        .status-预定 { background-color: #ff9f1c; }
-        .status-已出 { background-color: #e71d36; }
+        /* 区块网格 (Block Layout) */
+        .block-grid { display: grid; gap: 8px; }
+        .grid-tokyo { grid-template-columns: repeat(14, 1fr); }
+        .grid-osaka { grid-template-columns: repeat(7, 1fr); }
+        .grid-hiroshima { grid-template-columns: repeat(3, 1fr); }
+
+        .block-box { border: 1px solid #ddd; background: #fafafa; border-radius: 4px; min-height: 55px; padding: 5px; text-align: center; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; justify-content: space-between; }
+        .block-box:hover { border-color: var(--miku); box-shadow: 0 2px 8px rgba(57,197,187,0.3); transform: translateY(-2px); }
+        .block-name { font-size: 0.75rem; font-weight: bold; color: #555; }
+        .block-badge { font-size: 0.65rem; background: #eee; border-radius: 3px; padding: 2px; }
+
+        .status-在手 { background-color: #2ec4b6 !important; color: white; }
+        .status-预定 { background-color: #ff9f1c !important; color: white; }
+        .status-已出 { background-color: #e71d36 !important; color: white; }
         
         .bottom-section { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        @media (max-width: 768px) { .bottom-section { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { 
+            .bottom-section { grid-template-columns: 1fr; }
+            .grid-tokyo { grid-template-columns: repeat(7, 1fr); }
+        }
 
         .form-box, .log-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
         input, select, button { padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.85rem; }
         button.btn-submit { background: var(--miku); color: white; border: none; font-weight: bold; cursor: pointer; }
 
-        /* 日志本样式 */
         .log-list { max-height: 220px; overflow-y: auto; font-size: 0.8rem; border: 1px solid #eee; padding: 8px; border-radius: 5px; background: #fafafa; }
         .log-item { padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
         .log-time { color: #888; font-size: 0.75rem; }
         .log-user { font-weight: bold; color: #00796b; }
 
-        /* 模态弹窗 */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); justify-content: center; align-items: center; }
-        .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; overflow: auto; background: white; padding: 10px; position: relative; }
-        .modal-content img { width: 100%; height: auto; display: block; }
-        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; color: #333; cursor: pointer; }
+        /* 模态框 */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; position: relative; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 20px; cursor: pointer; }
+        .seat-item { border: 1px solid #eee; padding: 8px; margin: 5px 0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h2>⚡ Magical Mirai 票务看板</h2>
+        <h2>⚡ Magical Mirai 交互式票务地图</h2>
         <span id="sync-status" style="font-size: 0.8rem;">🔄 连接中...</span>
     </header>
 
-    <!-- 操作人设置区 -->
     <div class="operator-bar">
-        <span>👤 当前操作人名字：</span>
+        <span>👤 操作人姓名：</span>
         <input type="text" id="operator-name" placeholder="请输入你的名字" onchange="saveOperatorName()">
-        <span style="font-size:0.75rem; color:#666;">（每次修改、删除或新增票据都会记录此名字）</span>
+        <span style="font-size:0.75rem; color:#666;">（点击区块直接开票/改票，自动记录署名）</span>
     </div>
 
     <div class="legend">
@@ -81,56 +82,38 @@
         <div class="legend-item"><span class="dot status-已出"></span> 已出</div>
     </div>
 
-    <div class="stage-map-container">
+    <div class="venues-container">
         <!-- 广岛场 -->
-        <div class="map-card">
-            <div class="card-header">
-                <h3>广岛场</h3>
-                <button class="btn-img" onclick="showMap('hiroshima')">🖼️ 座位图</button>
-            </div>
+        <div class="venue-card">
+            <h3 class="venue-title">广岛场 (上野学园大厅)</h3>
             <div class="stage">STAGE 舞台</div>
-            <div class="type-section"><div class="type-title">🌐 海外票</div><div id="grid-广岛场-海外票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">👥 本土二连</div><div id="grid-广岛场-本土二连" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🇯🇵 本土母票</div><div id="grid-广岛场-本土母票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🎫 本土子票</div><div id="grid-广岛场-本土子票" class="seat-grid"></div></div>
+            <div id="blocks-hiroshima" class="block-grid grid-hiroshima"></div>
         </div>
 
         <!-- 大阪场 -->
-        <div class="map-card">
-            <div class="card-header">
-                <h3>大阪场</h3>
-                <button class="btn-img" onclick="showMap('osaka')">🖼️ 座位图</button>
-            </div>
+        <div class="venue-card">
+            <h3 class="venue-title">大阪场 (Intex 大阪 5号馆A)</h3>
             <div class="stage">STAGE 舞台</div>
-            <div class="type-section"><div class="type-title">🌐 海外票</div><div id="grid-大阪场-海外票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">👥 本土二连</div><div id="grid-大阪场-本土二连" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🇯🇵 本土母票</div><div id="grid-大阪场-本土母票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🎫 本土子票</div><div id="grid-大阪场-本土子票" class="seat-grid"></div></div>
+            <div id="blocks-osaka" class="block-grid grid-osaka"></div>
         </div>
 
         <!-- 东京场 -->
-        <div class="map-card">
-            <div class="card-header">
-                <h3>东京场</h3>
-                <button class="btn-img" onclick="showMap('tokyo')">🖼️ 座位图</button>
-            </div>
+        <div class="venue-card">
+            <h3 class="venue-title">东京场 (幕张展览馆 9号厅)</h3>
             <div class="stage">STAGE 舞台</div>
-            <div class="type-section"><div class="type-title">🌐 海外票</div><div id="grid-东京场-海外票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">👥 本土二连</div><div id="grid-东京场-本土二连" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🇯🇵 本土母票</div><div id="grid-东京场-本土母票" class="seat-grid"></div></div>
-            <div class="type-section"><div class="type-title">🎫 本土子票</div><div id="grid-东京场-本土子票" class="seat-grid"></div></div>
+            <div id="blocks-tokyo" class="block-grid grid-tokyo"></div>
         </div>
     </div>
 
     <div class="bottom-section">
         <!-- 录入票据 -->
         <div class="form-box">
-            <h3>➕ 录入票据</h3>
+            <h3>➕ 表单录入</h3>
             <div class="form-grid">
                 <select id="in-show">
-                    <option value="广岛场">广岛场</option>
-                    <option value="大阪场">大阪场</option>
                     <option value="东京场">东京场</option>
+                    <option value="大阪场">大阪场</option>
+                    <option value="广岛场">广岛场</option>
                 </select>
                 <select id="in-type">
                     <option value="海外票">海外票</option>
@@ -138,21 +121,21 @@
                     <option value="本土母票">本土母票</option>
                     <option value="本土子票">本土子票</option>
                 </select>
-                <input type="text" id="in-block" placeholder="Block/区 (例:A5)">
-                <input type="text" id="in-seat" placeholder="排号/座号 (例:3列18番)">
+                <input type="text" id="in-block" placeholder="Block/区 (如:A5)">
+                <input type="text" id="in-seat" placeholder="排/座号 (如:3列18番)">
                 <select id="in-status">
                     <option value="在手">在手</option>
                     <option value="预定">预定</option>
                     <option value="已出">已出</option>
                 </select>
                 <input type="text" id="in-price" placeholder="价格">
-                <input type="text" id="in-buyer" placeholder="买家/联系人">
+                <input type="text" id="in-buyer" placeholder="买家">
                 <input type="text" id="in-note" placeholder="备注">
-                <button class="btn-submit" onclick="addTicket()">保存票据</button>
+                <button class="btn-submit" onclick="addTicketForm()">保存票据</button>
             </div>
         </div>
 
-        <!-- 变动记录本 -->
+        <!-- 日志本 -->
         <div class="log-box">
             <h3>📖 变动记录本</h3>
             <div id="log-list" class="log-list">
@@ -162,11 +145,14 @@
     </div>
 </div>
 
-<!-- 图片弹窗 -->
-<div id="imgModal" class="modal" onclick="closeMap()">
+<!-- Block 内票据弹窗 -->
+<div id="blockModal" class="modal" onclick="closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
-        <span class="close-btn" onclick="closeMap()">&times;</span>
-        <img id="modalImg" src="" alt="座位图">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h3 id="modal-title">Block 详情</h3>
+        <div id="modal-seat-list"></div>
+        <hr style="margin:15px 0; border:none; border-top:1px dashed #ccc;">
+        <button class="btn-submit" style="width:100%;" onclick="quickAddTicketInBlock()">➕ 在此 Block 快速添加票据</button>
     </div>
 </div>
 
@@ -175,45 +161,45 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const MAP_URLS = {
-        hiroshima: 'https://rcchall.jp/images/seating.gif',
-        osaka: 'https://i.imgur.com/v8SgYtF.png', 
-        tokyo: 'https://i.imgur.com/c4Ywz2M.png'
+    // 根据场地定义 Block 列表
+    const MAP_DATA = {
+        '东京场': [
+            'A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','A12','A13','A14',
+            'B1','B2','B3','B4','B5','B6','B7','B8','B9','B10','B11','B12','B13','B14',
+            'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','C12','C13','C14',
+            'D1','D2','D3','PA','PA','PA','D7','D8','D9'
+        ],
+        '大阪场': [
+            '1列(左)','1列(中)','1列(右)','PA','着席指定','立见区','其他',
+            'A区','B区','C区','D区','E区','F区','G区'
+        ],
+        '广岛场': [
+            '1阶左区', '1阶中区', '1阶右区',
+            '2阶左区', '2阶中区', '2阶右区'
+        ]
     };
 
     let allTickets = [];
+    let activeShow = '';
+    let activeBlock = '';
 
     function init() {
-        // 加载之前存在本地的名字
-        const savedName = localStorage.getItem('miku_operator_name') || '';
-        document.getElementById('operator-name').value = savedName;
-
+        document.getElementById('operator-name').value = localStorage.getItem('miku_operator_name') || '';
+        renderBlockLayouts();
         fetchTickets();
         fetchLogs();
 
-        // 监听票据变动
-        _supabase.channel('tickets-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets())
-            .subscribe();
-
-        // 监听日志变动
-        _supabase.channel('logs-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs())
-            .subscribe();
+        _supabase.channel('tickets-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets()).subscribe();
+        _supabase.channel('logs-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs()).subscribe();
     }
 
     function saveOperatorName() {
-        const name = document.getElementById('operator-name').value.trim();
-        localStorage.setItem('miku_operator_name', name);
+        localStorage.setItem('miku_operator_name', document.getElementById('operator-name').value.trim());
     }
 
     function getOperatorName() {
         const name = document.getElementById('operator-name').value.trim();
-        if (!name) {
-            alert('请先在顶部填写【你的名字】，方便记录是谁作出的变动！');
-            document.getElementById('operator-name').focus();
-            return null;
-        }
+        if (!name) { alert('请先在顶部填写【你的名字】！'); return null; }
         return name;
     }
 
@@ -222,148 +208,163 @@
         await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
     }
 
-    async function fetchLogs() {
-        const { data } = await _supabase.from('ticket_logs').select('*').order('created_at', { ascending: false }).limit(30);
-        if (data) {
-            const container = document.getElementById('log-list');
-            if (data.length === 0) {
-                container.innerHTML = '<div style="color:#999;">暂无变动记录</div>';
-                return;
-            }
-            container.innerHTML = data.map(l => {
-                const timeStr = new Date(l.created_at).toLocaleString('zh-CN', { hour12: false });
-                return `
-                    <div class="log-item">
-                        <span class="log-time">[${timeStr}]</span> 
-                        <span class="log-user">${l.operator}</span> 
-                        <strong>${l.action}</strong>: ${l.detail}
-                    </div>
-                `;
-            }).join('');
-        }
+    function renderBlockLayouts() {
+        renderVenueBlocks('hiroshima', MAP_DATA['广岛场'], '广岛场');
+        renderVenueBlocks('osaka', MAP_DATA['大阪场'], '大阪场');
+        renderVenueBlocks('tokyo', MAP_DATA['东京场'], '东京场');
+    }
+
+    function renderVenueBlocks(elementId, blocks, showName) {
+        const container = document.getElementById(`blocks-${elementId}`);
+        container.innerHTML = blocks.map(b => `
+            <div class="block-box" id="block-${showName}-${b}" onclick="openBlockModal('${showName}', '${b}')">
+                <div class="block-name">${b}</div>
+                <div class="block-badge" id="badge-${showName}-${b}">无票</div>
+            </div>
+        `).join('');
     }
 
     async function fetchTickets() {
         const { data } = await _supabase.from('tickets').select('*');
         if (data) {
             allTickets = data;
-            renderMap();
+            updateBlockBadges();
             document.getElementById('sync-status').innerText = '🟢 实时同步中';
         }
     }
 
-    function renderMap() {
-        const shows = ['广岛场', '大阪场', '东京场'];
-        const types = ['海外票', '本土二连', '本土母票', '本土子票'];
-        
-        shows.forEach(s => {
-            types.forEach(t => {
-                const el = document.getElementById(`grid-${s}-${t}`);
-                if (el) el.innerHTML = '';
-            });
-        });
+    function updateBlockBadges() {
+        // 重置所有 Block
+        document.querySelectorAll('.block-box').forEach(el => el.className = 'block-box');
+        document.querySelectorAll('.block-badge').forEach(el => el.innerText = '无票');
 
         allTickets.forEach(t => {
-            let ticketType = '海外票';
-            if (t.note) {
-                if (t.note.includes('本土二连')) ticketType = '本土二连';
-                else if (t.note.includes('本土母票')) ticketType = '本土母票';
-                else if (t.note.includes('本土子票')) ticketType = '本土子票';
-                else if (t.note.includes('海外票')) ticketType = '海外票';
+            let block = '其他';
+            if (t.note && t.note.includes('BLOCK:')) {
+                const match = t.note.match(/BLOCK:([^\]]+)/);
+                if (match) block = match[1];
             }
 
-            const targetGridId = `grid-${t.show}-${ticketType}`;
-            const gridEl = document.getElementById(targetGridId);
+            const badgeEl = document.getElementById(`badge-${t.show}-${block}`);
+            const boxEl = document.getElementById(`block-${t.show}-${block}`);
 
-            if (gridEl) {
-                const node = document.createElement('div');
-                node.className = `seat-node status-${t.status}`;
-                
-                let blockStr = '';
-                if(t.note && t.note.includes('BLOCK:')) {
-                    const match = t.note.match(/BLOCK:([^\]]+)/);
-                    if(match) blockStr = `<span style="font-size:0.7rem; opacity:0.8;">[${match[1]}]</span> `;
-                }
-
-                node.innerHTML = `
-                    <div class="seat-title">${blockStr}${t.seat || '未命名'}</div>
-                    <div class="seat-sub">${t.buyer ? '👤 ' + t.buyer : ''} ${t.price ? '💴 ' + t.price : ''}</div>
-                `;
-                node.onclick = () => handleSeatClick(t);
-                gridEl.appendChild(node);
+            if (badgeEl && boxEl) {
+                badgeEl.innerText = `${t.seat} (${t.status})`;
+                boxEl.classList.add(`status-${t.status}`);
             }
         });
     }
 
-    async function handleSeatClick(ticket) {
+    function openBlockModal(show, block) {
+        activeShow = show;
+        activeBlock = block;
+        document.getElementById('modal-title').innerText = `${show} - ${block} 票据列表`;
+        
+        const ticketsInBlock = allTickets.filter(t => t.show === show && t.note && t.note.includes(`BLOCK:${block}`));
+        const listEl = document.getElementById('modal-seat-list');
+
+        if (ticketsInBlock.length === 0) {
+            listEl.innerHTML = '<div style="color:#888; margin:10px 0;">该区域暂无票据信息</div>';
+        } else {
+            listEl.innerHTML = ticketsInBlock.map(t => `
+                <div class="seat-item">
+                    <div>
+                        <strong>${t.seat}</strong> <span class="dot status-${t.status}"></span> [${t.status}]<br>
+                        <small>买家: ${t.buyer || '无'} | 价格: ${t.price || '无'}</small>
+                    </div>
+                    <div>
+                        <button onclick="toggleTicketStatus(${t.id}, '${t.status}', '${t.seat}')">切状态</button>
+                        <button style="color:red;" onclick="deleteTicket(${t.id}, '${t.seat}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('blockModal').style.display = 'flex';
+    }
+
+    async function toggleTicketStatus(id, currentStatus, seat) {
         const operator = getOperatorName();
         if (!operator) return;
 
-        const action = prompt(
-            `【${ticket.show} - ${ticket.seat}】\n` +
-            `当前状态: ${ticket.status}\n` +
-            `买家: ${ticket.buyer || '无'}\n` +
-            `价格: ${ticket.price || '无'}\n` +
-            `备注: ${ticket.note || '无'}\n\n` +
-            `请选择操作：\n` +
-            `输入 1 ：切换状态（在手 ➔ 预定 ➔ 已出）\n` +
-            `输入 2 ：彻底删除此票\n` +
-            `按取消或留空：不作修改`
-        );
+        const nextStatus = currentStatus === '在手' ? '预定' : (currentStatus === '预定' ? '已出' : '在手');
+        await _supabase.from('tickets').update({ status: nextStatus }).eq('id', id);
+        await addLog('修改状态', `【${activeShow}-${activeBlock} ${seat}】 ${currentStatus} ➔ ${nextStatus}`);
+        closeModal();
+        fetchTickets();
+    }
 
-        if (action === '1') {
-            const nextStatus = ticket.status === '在手' ? '预定' : (ticket.status === '预定' ? '已出' : '在手');
-            await _supabase.from('tickets').update({ status: nextStatus }).eq('id', ticket.id);
-            await addLog('修改状态', `将【${ticket.show} - ${ticket.seat}】的状态由 [${ticket.status}] 切换为 [${nextStatus}]`);
+    async function deleteTicket(id, seat) {
+        const operator = getOperatorName();
+        if (!operator) return;
+
+        if (confirm(`确定删除【${activeShow}-${activeBlock} ${seat}】吗？`)) {
+            await _supabase.from('tickets').delete().eq('id', id);
+            await addLog('删除票据', `删除了【${activeShow}-${activeBlock} ${seat}】`);
+            closeModal();
             fetchTickets();
-        } else if (action === '2') {
-            if (confirm(`确定要彻底删除【${ticket.show} - ${ticket.seat}】吗？`)) {
-                await _supabase.from('tickets').delete().eq('id', ticket.id);
-                await addLog('删除票据', `删除了【${ticket.show} - ${ticket.seat}】`);
-                fetchTickets();
-            }
         }
     }
 
-    async function addTicket() {
+    async function quickAddTicketInBlock() {
+        const operator = getOperatorName();
+        if (!operator) return;
+
+        const seat = prompt(`请输入【${activeShow} - ${activeBlock}】的排号/座号 (如: 3列18番)：`);
+        if (!seat) return;
+
+        const buyer = prompt('买家/联系人 (选填)：') || '';
+        const price = prompt('价格 (选填)：') || '';
+        const note = `[海外票][BLOCK:${activeBlock}]`;
+
+        const { error } = await _supabase.from('tickets').insert([{ show: activeShow, seat, status: '在手', price, buyer, note }]);
+        if (!error) {
+            await addLog('录入票据', `新增了【${activeShow}-${activeBlock} ${seat}】`);
+            closeModal();
+            fetchTickets();
+        }
+    }
+
+    async function addTicketForm() {
         const operator = getOperatorName();
         if (!operator) return;
 
         const show = document.getElementById('in-show').value;
         const type = document.getElementById('in-type').value;
-        const block = document.getElementById('in-block').value;
+        const block = document.getElementById('in-block').value || '其他';
         const seat = document.getElementById('in-seat').value;
         const status = document.getElementById('in-status').value;
         const price = document.getElementById('in-price').value;
         const buyer = document.getElementById('in-buyer').value;
         let userNote = document.getElementById('in-note').value;
 
-        if(!seat) { alert('请填写排号或座号！'); return; }
+        if (!seat) { alert('请填写排号/座号！'); return; }
 
-        let note = `[${type}]`;
-        if(block) note += `[BLOCK:${block}]`;
-        if(userNote) note += ` ${userNote}`;
-
+        let note = `[${type}][BLOCK:${block}] ${userNote}`;
         const { error } = await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
-        if (error) {
-            alert('保存失败，请刷新重试');
-        } else {
-            await addLog('录入票据', `新增了【${show} - ${block ? block + ' ' : ''}${seat}】(${status})`);
-            document.getElementById('in-block').value = '';
+        
+        if (!error) {
+            await addLog('录入票据', `新增了【${show}-${block} ${seat}】(${status})`);
             document.getElementById('in-seat').value = '';
-            document.getElementById('in-note').value = '';
             fetchTickets();
         }
     }
 
-    function showMap(key) {
-        document.getElementById('modalImg').src = MAP_URLS[key];
-        document.getElementById('imgModal').style.display = 'flex';
+    async function fetchLogs() {
+        const { data } = await _supabase.from('ticket_logs').select('*').order('created_at', { ascending: false }).limit(30);
+        if (data) {
+            const container = document.getElementById('log-list');
+            container.innerHTML = data.length === 0 ? '<div style="color:#999;">暂无变动记录</div>' : data.map(l => `
+                <div class="log-item">
+                    <span class="log-time">[${new Date(l.created_at).toLocaleTimeString('zh-CN')}]</span> 
+                    <span class="log-user">${l.operator}</span> 
+                    <strong>${l.action}</strong>: ${l.detail}
+                </div>
+            `).join('');
+        }
     }
 
-    function closeMap() {
-        document.getElementById('imgModal').style.display = 'none';
-    }
+    function closeModal() { document.getElementById('blockModal').style.display = 'none'; }
 
     init();
 </script>
