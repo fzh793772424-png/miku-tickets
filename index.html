@@ -96,15 +96,15 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- 🎫 录入/打点表单 (支持选区与座位) -->
+    <!-- 🎫 录入/打点表单 (包含“未出座位”选项) -->
     <div class="quick-add-card">
         <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入与选择：</strong>
         <div class="form-row">
             <select id="quick-block" onchange="updateSeatDropdown()">
                 <option value="">-- 选择 Block 区域 --</option>
             </select>
-            <select id="quick-seat" style="max-width:160px;">
-                <option value="">-- 选择座位 (可选) --</option>
+            <select id="quick-seat" style="max-width:180px;">
+                <option value="待分配(未出座位)">❓ 待分配 (未出座位)</option>
             </select>
             <select id="quick-source">
                 <option value="本土票">日本本土票</option>
@@ -164,12 +164,12 @@
     </div>
 </div>
 
-<!-- 座位点阵 Modal (支持多选) -->
+<!-- 座位点阵 Modal -->
 <div id="seatModal" class="modal" onclick="closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeModal()">&times;</span>
         <h3 id="modal-title" style="margin-top:0;">Block 座位详情</h3>
-        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 支持点击多选座位（再次点击可取消选择），选完后统一点击下方保存。</div>
+        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 支持点击多选座位（再次点击取消），选完后统一点击下方保存。未出票可在顶部直接录入或稍后补填。</div>
         
         <div id="seat-grid-container" class="seat-grid"></div>
 
@@ -196,7 +196,7 @@
     let currentVenue = '东京场';
     let allTickets = [];
     let currentBlock = '';
-    let selectedSeatsArray = []; // 多选集
+    let selectedSeatsArray = [];
 
     const TOKYO_CONFIG = {
         'A1': { startCol: 9, endCol: 15, seats: 7 }, 'A2': { startCol: 7, endCol: 15, seats: 14 },
@@ -309,7 +309,6 @@
         return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')"><div class="block-title">${label}</div></div>`;
     }
 
-    // 联动表单下拉菜单
     function populateBlockDropdown() {
         const select = document.getElementById('quick-block');
         let keys = [];
@@ -318,14 +317,14 @@
         else keys = Object.keys(OSAKA_CONFIG);
 
         select.innerHTML = '<option value="">-- 选择 Block 区域 --</option>' + keys.map(k => `<option value="${k}">${k}</option>`).join('');
-        document.getElementById('quick-seat').innerHTML = '<option value="">-- 选择座位 (可选) --</option>';
+        document.getElementById('quick-seat').innerHTML = '<option value="待分配(未出座位)">❓ 待分配 (未出座位)</option>';
     }
 
     function updateSeatDropdown() {
         const block = document.getElementById('quick-block').value;
         const seatSelect = document.getElementById('quick-seat');
         if (!block) {
-            seatSelect.innerHTML = '<option value="">-- 选择座位 (可选) --</option>';
+            seatSelect.innerHTML = '<option value="待分配(未出座位)">❓ 待分配 (未出座位)</option>';
             return;
         }
 
@@ -360,7 +359,7 @@
             }
         }
 
-        seatSelect.innerHTML = '<option value="">-- 选择座位 (可选) --</option>' + seats.map(s => `<option value="${s}">${s}</option>`).join('');
+        seatSelect.innerHTML = '<option value="待分配(未出座位)">❓ 待分配 (未出座位)</option>' + seats.map(s => `<option value="${s}">${s}</option>`).join('');
     }
 
     async function fetchTickets() {
@@ -402,7 +401,8 @@
                 }
                 const source = (t.note && t.note.includes('海外票')) ? '🌏 海外票' : '🇯🇵 本土票';
                 const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="background:#e0f2f1; color:#00796b; padding:2px 6px; border-radius:3px; font-weight:bold;">👭 2连番</span>` : `👤 单人票`;
-                const seatDisplay = t.seat ? `<strong style="color:var(--miku);">${t.seat}</strong>` : `<span style="color:#aaa;">未出/待补填</span>`;
+                const isUnassigned = !t.seat || t.seat.includes('待分配');
+                const seatDisplay = !isUnassigned ? `<strong style="color:var(--miku);">${t.seat}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 未出/待分配</span>`;
                 
                 return `
                     <tr>
@@ -414,7 +414,7 @@
                         <td>${t.buyer || '-'}</td>
                         <td>${t.price ? '¥' + t.price : '-'}</td>
                         <td>
-                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${t.seat || ''}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填/修改</button>
+                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${isUnassigned ? '' : t.seat}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填/修改</button>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
                         </td>
                     </tr>
@@ -457,7 +457,7 @@
             note: `[BLOCK:${block}][${source}][${type}]`
         }]);
 
-        await addLog('录入票据', `新增【${currentVenue} ${block}区 ${seat ? seat : ''}】 ${type} (${source}, ${status})`);
+        await addLog('录入票据', `新增【${currentVenue} ${block}区 ${seat}】 ${type} (${source}, ${status})`);
 
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
@@ -468,7 +468,7 @@
         const operator = getOperatorName();
         if (!operator) return;
 
-        const newSeat = prompt(`为【${currentVenue} ${blockCode}】补填具体座位号（如果是2连番可填如: 13列7番,8番）：`, oldSeat);
+        const newSeat = prompt(`为【${currentVenue} ${blockCode}】补填具体座位号（如: 13列7番,8番）：`, oldSeat);
         if (newSeat !== null) {
             await _supabase.from('tickets').update({ seat: newSeat.trim() }).eq('id', ticketId);
             await addLog('补填座位', `更新【${currentVenue} ${blockCode}】座位为: ${newSeat}`);
@@ -558,7 +558,6 @@
         return allTickets.find(t => t.show === show && t.seat && t.seat.includes(seatStr) && t.note && t.note.includes(`BLOCK:${block}`));
     }
 
-    // 💡 支持多选/取消多选
     function toggleSeatSelect(seatStr, el) {
         const index = selectedSeatsArray.indexOf(seatStr);
         if (index > -1) {
@@ -570,7 +569,6 @@
         }
     }
 
-    // 批量保存当前多选的座位为同一张票据（1连或2连）
     async function saveSeatTicketsMulti() {
         const operator = getOperatorName();
         if (!operator) return;
