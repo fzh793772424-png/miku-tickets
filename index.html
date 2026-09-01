@@ -3,35 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magical Mirai 票务图形看板</title>
+    <title>Magical Mirai 票务分类看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --miku: #39C5BB; --bg: #f4f7f6; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
-        .container { max-width: 1000px; margin: 0 auto; }
+        .container { max-width: 1100px; margin: 0 auto; }
         header { background: var(--miku); color: white; padding: 15px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
         
         .legend { display: flex; gap: 15px; justify-content: center; margin: 15px 0; font-size: 0.85rem; }
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
         
-        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .map-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .stage { background: #333; color: white; text-align: center; padding: 6px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; margin-bottom: 12px; }
         
-        .seat-section { margin-top: 10px; }
-        .section-title { font-size: 0.75rem; color: #666; margin-bottom: 5px; text-align: center; }
-        .seat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .type-section { margin-top: 12px; border-top: 1px dashed #eee; padding-top: 8px; }
+        .type-title { font-size: 0.8rem; font-weight: bold; color: #555; margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .seat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
         
-        .seat-node { border-radius: 5px; padding: 8px 4px; text-align: center; font-size: 0.75rem; color: white; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
-        .seat-node:active { transform: scale(0.95); }
+        .seat-node { border-radius: 6px; padding: 8px; text-align: left; font-size: 0.75rem; color: white; cursor: pointer; transition: transform 0.1s; }
+        .seat-node:active { transform: scale(0.96); }
+        .seat-node .seat-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 2px; }
+        .seat-node .seat-sub { font-size: 0.7rem; opacity: 0.9; }
+        
         .status-在手 { background-color: #2ec4b6; }
         .status-预定 { background-color: #ff9f1c; }
         .status-已出 { background-color: #e71d36; }
         
         .form-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
-        input, select, button { padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+        input, select, button { padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.85rem; }
         button { background: var(--miku); color: white; border: none; font-weight: bold; cursor: pointer; }
     </style>
 </head>
@@ -39,7 +42,7 @@
 
 <div class="container">
     <header>
-        <h2>⚡ Ticket Map 座位图形看板</h2>
+        <h2>⚡ Magical Mirai 票务看板</h2>
         <span id="sync-status" style="font-size: 0.8rem;">🔄 连接中...</span>
     </header>
 
@@ -50,68 +53,85 @@
         <div class="legend-item"><span class="dot status-已出"></span> 已出</div>
     </div>
 
-    <!-- 图形化座位展示区（从左到右：广岛 -> 大阪 -> 东京） -->
+    <!-- 图形看板：按 广岛 | 大阪 | 东京 展示 -->
     <div class="stage-map-container">
         <!-- 广岛场 -->
         <div class="map-card">
-            <h3 style="text-align: center; margin-top:0;">广岛场</h3>
-            <div class="stage">STAGE 舞台 FRONT</div>
-            <div class="seat-section">
-                <div class="section-title">--- SS 区 ---</div>
-                <div id="grid-广岛场-SS" class="seat-grid"></div>
+            <h3 style="text-align: center; margin-top:0; color:#333;">广岛场</h3>
+            <div class="stage">STAGE 舞台</div>
+            <div class="type-section">
+                <div class="type-title">🌐 海外场</div>
+                <div id="grid-广岛场-海外场" class="seat-grid"></div>
             </div>
-            <div class="seat-section">
-                <div class="section-title">--- S / A 区 ---</div>
-                <div id="grid-广岛场-其他" class="seat-grid"></div>
+            <div class="type-section">
+                <div class="type-title">🇯🇵 本土母票</div>
+                <div id="grid-广岛场-本土母票" class="seat-grid"></div>
+            </div>
+            <div class="type-section">
+                <div class="type-title">🎫 本土子票</div>
+                <div id="grid-广岛场-本土子票" class="seat-grid"></div>
             </div>
         </div>
 
         <!-- 大阪场 -->
         <div class="map-card">
-            <h3 style="text-align: center; margin-top:0;">大阪场</h3>
-            <div class="stage">STAGE 舞台 FRONT</div>
-            <div class="seat-section">
-                <div class="section-title">--- SS 区 ---</div>
-                <div id="grid-大阪场-SS" class="seat-grid"></div>
+            <h3 style="text-align: center; margin-top:0; color:#333;">大阪场</h3>
+            <div class="stage">STAGE 舞台</div>
+            <div class="type-section">
+                <div class="type-title">🌐 海外场</div>
+                <div id="grid-大阪场-海外场" class="seat-grid"></div>
             </div>
-            <div class="seat-section">
-                <div class="section-title">--- S / A 区 ---</div>
-                <div id="grid-大阪场-其他" class="seat-grid"></div>
+            <div class="type-section">
+                <div class="type-title">🇯🇵 本土母票</div>
+                <div id="grid-大阪场-本土母票" class="seat-grid"></div>
+            </div>
+            <div class="type-section">
+                <div class="type-title">🎫 本土子票</div>
+                <div id="grid-大阪场-本土子票" class="seat-grid"></div>
             </div>
         </div>
 
         <!-- 东京场 -->
         <div class="map-card">
-            <h3 style="text-align: center; margin-top:0;">东京场</h3>
-            <div class="stage">STAGE 舞台 FRONT</div>
-            <div class="seat-section">
-                <div class="section-title">--- SS 区 ---</div>
-                <div id="grid-东京场-SS" class="seat-grid"></div>
+            <h3 style="text-align: center; margin-top:0; color:#333;">东京场</h3>
+            <div class="stage">STAGE 舞台</div>
+            <div class="type-section">
+                <div class="type-title">🌐 海外场</div>
+                <div id="grid-东京场-海外场" class="seat-grid"></div>
             </div>
-            <div class="seat-section">
-                <div class="section-title">--- S / A 区 ---</div>
-                <div id="grid-东京场-其他" class="seat-grid"></div>
+            <div class="type-section">
+                <div class="type-title">🇯🇵 本土母票</div>
+                <div id="grid-东京场-本土母票" class="seat-grid"></div>
+            </div>
+            <div class="type-section">
+                <div class="type-title">🎫 本土子票</div>
+                <div id="grid-东京场-本土子票" class="seat-grid"></div>
             </div>
         </div>
     </div>
 
-    <!-- 快速录入/改票 -->
+    <!-- 录入/改票表单 -->
     <div class="form-box">
-        <h3>➕ 录入/更新票务</h3>
+        <h3>➕ 录入票据</h3>
         <div class="form-grid">
             <select id="in-show">
                 <option value="广岛场">广岛场</option>
                 <option value="大阪场">大阪场</option>
                 <option value="东京场">东京场</option>
             </select>
-            <input type="text" id="in-seat" placeholder="位置 (例: SS 5排12)">
+            <select id="in-type">
+                <option value="海外场">海外场</option>
+                <option value="本土母票">本土母票</option>
+                <option value="本土子票">本土子票</option>
+            </select>
+            <input type="text" id="in-seat" placeholder="编号/位置 (例: 01号)">
             <select id="in-status">
                 <option value="在手">在手</option>
                 <option value="预定">预定</option>
                 <option value="已出">已出</option>
             </select>
             <input type="text" id="in-price" placeholder="价格">
-            <input type="text" id="in-buyer" placeholder="买家/对接人">
+            <input type="text" id="in-buyer" placeholder="买家/联系人">
             <input type="text" id="in-note" placeholder="备注">
             <button onclick="addTicket()">保存票据</button>
         </div>
@@ -143,22 +163,33 @@
     }
 
     function renderMap() {
-        const containers = ['广岛场-SS', '广岛场-其他', '大阪场-SS', '大阪场-其他', '东京场-SS', '东京场-其他'];
-        containers.forEach(id => {
-            const el = document.getElementById(`grid-${id}`);
-            if(el) el.innerHTML = '';
+        const shows = ['广岛场', '大阪场', '东京场'];
+        const types = ['海外场', '本土母票', '本土子票'];
+        
+        shows.forEach(s => {
+            types.forEach(t => {
+                const el = document.getElementById(`grid-${s}-${t}`);
+                if (el) el.innerHTML = '';
+            });
         });
 
         allTickets.forEach(t => {
-            const isSS = t.seat && t.seat.toUpperCase().includes('SS');
-            const targetGridId = `grid-${t.show}-${isSS ? 'SS' : '其他'}`;
+            // 兼容性判断：如果备注或位置包含对应词汇，自动匹配分类，默认归为海外场
+            let ticketType = '海外场';
+            if (t.note && t.note.includes('本土母票')) ticketType = '本土母票';
+            else if (t.note && t.note.includes('本土子票')) ticketType = '本土子票';
+            else if (t.note && t.note.includes('海外场')) ticketType = '海外场';
+
+            const targetGridId = `grid-${t.show}-${ticketType}`;
             const gridEl = document.getElementById(targetGridId);
 
             if (gridEl) {
                 const node = document.createElement('div');
                 node.className = `seat-node status-${t.status}`;
-                node.innerText = t.seat || '未命名';
-                node.title = `买家: ${t.buyer||'无'}\n价格: ${t.price||'无'}\n备注: ${t.note||'无'}`;
+                node.innerHTML = `
+                    <div class="seat-title">${t.seat || '未命名'}</div>
+                    <div class="seat-sub">${t.buyer ? '👤 ' + t.buyer : ''} ${t.price ? '💴 ' + t.price : ''}</div>
+                `;
                 node.onclick = () => handleSeatClick(t);
                 gridEl.appendChild(node);
             }
@@ -166,7 +197,7 @@
     }
 
     async function handleSeatClick(ticket) {
-        const action = confirm(`【${ticket.show} - ${ticket.seat}】\n状态: ${ticket.status}\n买家: ${ticket.buyer||'无'}\n价格: ${ticket.price||'无'}\n备注: ${ticket.note||'无'}\n\n按“确定”切换状态（在手->预定->已出），按“取消”不做更改。`);
+        const action = confirm(`【${ticket.show} - ${ticket.seat}】\n状态: ${ticket.status}\n买家: ${ticket.buyer||'无'}\n价格: ${ticket.price||'无'}\n备注: ${ticket.note||'无'}\n\n点击【确定】切换状态（在手->预定->已出），点击【取消】不作修改。`);
         if (action) {
             const nextStatus = ticket.status === '在手' ? '预定' : (ticket.status === '预定' ? '已出' : '在手');
             await _supabase.from('tickets').update({ status: nextStatus }).eq('id', ticket.id);
@@ -175,13 +206,17 @@
 
     async function addTicket() {
         const show = document.getElementById('in-show').value;
+        const type = document.getElementById('in-type').value;
         const seat = document.getElementById('in-seat').value;
         const status = document.getElementById('in-status').value;
         const price = document.getElementById('in-price').value;
         const buyer = document.getElementById('in-buyer').value;
-        const note = document.getElementById('in-note').value;
+        let note = document.getElementById('in-note').value;
 
-        if(!seat) { alert('请填写座位位置！'); return; }
+        if(!seat) { alert('请填写临时编号或位置！'); return; }
+
+        // 将票种信息存入备注方便自动识别
+        note = `[${type}] ${note}`;
 
         await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
         document.getElementById('in-seat').value = '';
