@@ -53,7 +53,6 @@
     </div>
 
     <div class="stage-map-container">
-        <!-- 广岛场 -->
         <div class="map-card">
             <h3 style="text-align: center; margin-top:0; color:#333;">广岛场</h3>
             <div class="stage">STAGE 舞台</div>
@@ -75,7 +74,6 @@
             </div>
         </div>
 
-        <!-- 大阪场 -->
         <div class="map-card">
             <h3 style="text-align: center; margin-top:0; color:#333;">大阪场</h3>
             <div class="stage">STAGE 舞台</div>
@@ -97,7 +95,6 @@
             </div>
         </div>
 
-        <!-- 东京场 -->
         <div class="map-card">
             <h3 style="text-align: center; margin-top:0; color:#333;">东京场</h3>
             <div class="stage">STAGE 舞台</div>
@@ -120,7 +117,6 @@
         </div>
     </div>
 
-    <!-- 录入票据 -->
     <div class="form-box">
         <h3>➕ 录入票据</h3>
         <div class="form-grid">
@@ -163,14 +159,12 @@
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     document.getElementById('sync-status').innerText = '🟢 实时同步中';
-                } else {
-                    document.getElementById('sync-status').innerText = '🟡 尝试连接...';
                 }
             });
     }
 
     async function fetchTickets() {
-        const { data, error } = await _supabase.from('tickets').select('*');
+        const { data } = await _supabase.from('tickets').select('*');
         if (data) {
             allTickets = data;
             renderMap();
@@ -238,7 +232,7 @@
 
         const { error } = await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
         if (error) {
-            alert('保存失败，请检查数据库设置');
+            alert('保存失败，请刷新重试');
         } else {
             document.getElementById('in-seat').value = '';
             document.getElementById('in-note').value = '';
