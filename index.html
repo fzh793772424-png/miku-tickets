@@ -58,7 +58,7 @@
         .seat-grid { display: grid; gap: 4px; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; overflow-x: auto; }
         .seat-node { width: 28px; height: 28px; border: 1px solid #ccc; background: white; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .seat-node:hover { border-color: var(--miku); background: #e0f2f1; }
-        .seat-node.selected { background: var(--miku); color: white; font-weight: bold; }
+        .seat-node.selected { background: var(--miku) !important; color: white !important; font-weight: bold; border-color: #00796b !important; }
 
         .log-box { background: white; padding: 15px; border-radius: 8px; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fafafa; padding: 8px; border: 1px solid #eee; }
@@ -96,11 +96,16 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- 🎫 出座号前：丰富记票表单 -->
+    <!-- 🎫 录入/打点表单 (支持选区与座位) -->
     <div class="quick-add-card">
-        <strong style="font-size:1rem; color:#00796b;">✍️ 出座号前·录入票据：</strong>
+        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入与选择：</strong>
         <div class="form-row">
-            <input type="text" id="quick-block" placeholder="区域/Block (如: A3)" style="width:130px;">
+            <select id="quick-block" onchange="updateSeatDropdown()">
+                <option value="">-- 选择 Block 区域 --</option>
+            </select>
+            <select id="quick-seat" style="max-width:160px;">
+                <option value="">-- 选择座位 (可选) --</option>
+            </select>
             <select id="quick-source">
                 <option value="本土票">日本本土票</option>
                 <option value="海外票">海外先行票</option>
@@ -122,14 +127,14 @@
 
     <!-- 📋 票据明细与汇总列表 -->
     <div class="ticket-list-card">
-        <strong style="font-size:1rem;">📋 当前场馆票据明细（可在出座位后直接点“补填座位”挂载）</strong>
+        <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
         <table class="ticket-table">
             <thead>
                 <tr>
                     <th>区域 (Block)</th>
                     <th>票源</th>
                     <th>类型</th>
-                    <th>座位号 (出座后填写)</th>
+                    <th>座位号</th>
                     <th>状态</th>
                     <th>买家</th>
                     <th>价格</th>
@@ -159,17 +164,17 @@
     </div>
 </div>
 
-<!-- 座位点阵 Modal -->
+<!-- 座位点阵 Modal (支持多选) -->
 <div id="seatModal" class="modal" onclick="closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeModal()">&times;</span>
         <h3 id="modal-title" style="margin-top:0;">Block 座位详情</h3>
-        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">出座位后，可直接在点阵图上点击选择设置/修改票据</div>
+        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 支持点击多选座位（再次点击可取消选择），选完后统一点击下方保存。</div>
         
         <div id="seat-grid-container" class="seat-grid"></div>
 
         <div style="margin-top:15px; background:#f0f4f8; padding:10px; border-radius:6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <span>选中座位操作：</span>
+            <span>针对当前选中座位：</span>
             <select id="set-status">
                 <option value="在手">标记为：在手</option>
                 <option value="预定">标记为：预定</option>
@@ -177,8 +182,8 @@
             </select>
             <input type="text" id="set-buyer" placeholder="买家(选填)" style="width:100px;">
             <input type="text" id="set-price" placeholder="价格(选填)" style="width:80px;">
-            <button onclick="saveSeatTicket()" style="background:var(--miku); color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">保存该座</button>
-            <button onclick="deleteSeatTicket()" style="background:#e71d36; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">删除票据</button>
+            <button onclick="saveSeatTicketsMulti()" style="background:var(--miku); color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">保存选中座位</button>
+            <button onclick="deleteSeatTicketsMulti()" style="background:#e71d36; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">清除选中座位的票</button>
         </div>
     </div>
 </div>
@@ -191,7 +196,7 @@
     let currentVenue = '东京场';
     let allTickets = [];
     let currentBlock = '';
-    let currentSelectedSeat = '';
+    let selectedSeatsArray = []; // 多选集
 
     const TOKYO_CONFIG = {
         'A1': { startCol: 9, endCol: 15, seats: 7 }, 'A2': { startCol: 7, endCol: 15, seats: 14 },
@@ -221,17 +226,17 @@
     };
 
     const OSAKA_CONFIG = {
-        'Z1': { startCol: 9, endCol: 48, startSeat: 1, endSeat: 6, name: '1-6番' },
-        'Z2': { startCol: 3, endCol: 48, startSeat: 7, endSeat: 18, name: '7-18番' },
-        'Z3': { startCol: 1, endCol: 48, startSeat: 19, endSeat: 30, name: '19-30番' },
-        'Z4': { startCol: 1, endCol: 48, startSeat: 31, endSeat: 42, name: '31-42番' },
-        'Z5': { startCol: 1, endCol: 48, startSeat: 43, endSeat: 54, name: '43-54番' },
-        'Z6': { startCol: 1, endCol: 48, startSeat: 55, endSeat: 66, name: '55-66番' },
-        'Z7': { startCol: 1, endCol: 48, startSeat: 67, endSeat: 78, name: '67-78番' },
-        'Z8': { startCol: 3, endCol: 48, startSeat: 79, endSeat: 90, name: '79-90番' },
-        'Z9': { startCol: 9, endCol: 48, startSeat: 91, endSeat: 96, name: '91-96番' },
-        'L-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, name: '左侧着席区(A-E列)' },
-        'R-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, name: '右侧着席区(A-E列)' }
+        'Z1': { startCol: 9, endCol: 48, startSeat: 1, endSeat: 6 },
+        'Z2': { startCol: 3, endCol: 48, startSeat: 7, endSeat: 18 },
+        'Z3': { startCol: 1, endCol: 48, startSeat: 19, endSeat: 30 },
+        'Z4': { startCol: 1, endCol: 48, startSeat: 31, endSeat: 42 },
+        'Z5': { startCol: 1, endCol: 48, startSeat: 43, endSeat: 54 },
+        'Z6': { startCol: 1, endCol: 48, startSeat: 55, endSeat: 66 },
+        'Z7': { startCol: 1, endCol: 48, startSeat: 67, endSeat: 78 },
+        'Z8': { startCol: 3, endCol: 48, startSeat: 79, endSeat: 90 },
+        'Z9': { startCol: 9, endCol: 48, startSeat: 91, endSeat: 96 },
+        'L-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37 },
+        'R-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37 }
     };
 
     function init() {
@@ -251,6 +256,7 @@
         if (venue === '大阪场') document.getElementById('btn-osaka').classList.add('active');
         if (venue === '广岛场') document.getElementById('btn-hiroshima').classList.add('active');
         renderCurrentVenue();
+        populateBlockDropdown();
         updateStatsAndHighlights();
     }
 
@@ -296,10 +302,65 @@
             html += '</div>';
             container.innerHTML = html;
         }
+        populateBlockDropdown();
     }
 
     function makeBlockHtml(code, label) {
         return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')"><div class="block-title">${label}</div></div>`;
+    }
+
+    // 联动表单下拉菜单
+    function populateBlockDropdown() {
+        const select = document.getElementById('quick-block');
+        let keys = [];
+        if (currentVenue === '东京场') keys = Object.keys(TOKYO_CONFIG);
+        else if (currentVenue === '广岛场') keys = Object.keys(HIROSHIMA_CONFIG);
+        else keys = Object.keys(OSAKA_CONFIG);
+
+        select.innerHTML = '<option value="">-- 选择 Block 区域 --</option>' + keys.map(k => `<option value="${k}">${k}</option>`).join('');
+        document.getElementById('quick-seat').innerHTML = '<option value="">-- 选择座位 (可选) --</option>';
+    }
+
+    function updateSeatDropdown() {
+        const block = document.getElementById('quick-block').value;
+        const seatSelect = document.getElementById('quick-seat');
+        if (!block) {
+            seatSelect.innerHTML = '<option value="">-- 选择座位 (可选) --</option>';
+            return;
+        }
+
+        let seats = [];
+        if (currentVenue === '东京场') {
+            const conf = TOKYO_CONFIG[block];
+            if (conf) {
+                if (conf.isStanding) {
+                    for (let i = 1; i <= conf.seats; i++) seats.push(`${i}番`);
+                } else {
+                    for (let col = conf.startCol; col <= conf.endCol; col++) {
+                        for (let s = 1; s <= conf.seats; s++) seats.push(`${col}列${s}番`);
+                    }
+                }
+            }
+        } else if (currentVenue === '广岛场') {
+            const conf = HIROSHIMA_CONFIG[block];
+            if (conf) {
+                for (let col = conf.startCol; col <= conf.endCol; col++) {
+                    for (let s = conf.startSeat; s <= conf.endSeat; s++) seats.push(`${col}排${s}座`);
+                }
+            }
+        } else {
+            const conf = OSAKA_CONFIG[block];
+            if (conf) {
+                const is着席 = block.includes('着席');
+                const rowLabel = is着席 ? ['A','B','C','D','E'] : [];
+                for (let col = conf.startCol; col <= conf.endCol; col++) {
+                    const label = is着席 ? `${rowLabel[col-1]}列` : `${col}列`;
+                    for (let s = conf.startSeat; s <= conf.endSeat; s++) seats.push(`${label}${s}番`);
+                }
+            }
+        }
+
+        seatSelect.innerHTML = '<option value="">-- 选择座位 (可选) --</option>' + seats.map(s => `<option value="${s}">${s}</option>`).join('');
     }
 
     async function fetchTickets() {
@@ -313,7 +374,6 @@
     function updateStatsAndHighlights() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
 
-        // 1. 更新顶部统计看板
         document.getElementById('stat-total').innerText = venueTickets.length;
         document.getElementById('stat-in-hand').innerText = venueTickets.filter(t => t.status === '在手').length;
         document.getElementById('stat-reserved').innerText = venueTickets.filter(t => t.status === '预定').length;
@@ -330,7 +390,6 @@
         });
         document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
-        // 2. 渲染票据明细表格
         const tbody = document.getElementById('ticket-list-body');
         if (venueTickets.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">暂无数据</td></tr>`;
@@ -355,7 +414,7 @@
                         <td>${t.buyer || '-'}</td>
                         <td>${t.price ? '¥' + t.price : '-'}</td>
                         <td>
-                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${t.seat || ''}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填座位</button>
+                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${t.seat || ''}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填/修改</button>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
                         </td>
                     </tr>
@@ -363,7 +422,6 @@
             }).join('');
         }
 
-        // 3. 更新地图高亮
         document.querySelectorAll('.block-box').forEach(el => el.classList.remove('bg-在手', 'bg-预定', 'bg-已出'));
         venueTickets.forEach(t => {
             let blockCode = '';
@@ -376,38 +434,36 @@
         });
     }
 
-    // 单条记录录入（2连番只显示/存入1张记录）
     async function addQuickTicket() {
         const operator = getOperatorName();
         if (!operator) return;
 
-        const block = document.getElementById('quick-block').value.trim();
+        const block = document.getElementById('quick-block').value;
+        const seat = document.getElementById('quick-seat').value;
         const source = document.getElementById('quick-source').value;
         const type = document.getElementById('quick-type').value;
         const status = document.getElementById('quick-status').value;
         const buyer = document.getElementById('quick-buyer').value.trim();
         const price = document.getElementById('quick-price').value.trim();
 
-        if (!block) { alert('请填写区域 (Block)，如: A3'); return; }
+        if (!block) { alert('请先选择 Block 区域！'); return; }
 
         await _supabase.from('tickets').insert([{
             show: currentVenue,
-            seat: '',
+            seat: seat,
             status: status,
             buyer: buyer,
             price: price,
             note: `[BLOCK:${block}][${source}][${type}]`
         }]);
 
-        await addLog('录入票据', `新增【${currentVenue} ${block}区】 ${type} (${source}, ${status})`);
+        await addLog('录入票据', `新增【${currentVenue} ${block}区 ${seat ? seat : ''}】 ${type} (${source}, ${status})`);
 
-        document.getElementById('quick-block').value = '';
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
         fetchTickets();
     }
 
-    // 📌 出座后：在表格中补填/修改座位号（可填多个，如: 13列7番,8番）
     async function editSeatNumber(ticketId, blockCode, oldSeat) {
         const operator = getOperatorName();
         if (!operator) return;
@@ -433,7 +489,7 @@
 
     function openSeatModal(blockCode) {
         currentBlock = blockCode;
-        currentSelectedSeat = '';
+        selectedSeatsArray = [];
         document.getElementById('modal-title').innerText = `${currentVenue} - ${blockCode} 座位阵列`;
         const container = document.getElementById('seat-grid-container');
 
@@ -445,7 +501,7 @@
                 for(let i=1; i<=conf.seats; i++) {
                     const seatStr = `${i}番`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="selectSeat('${seatStr}', this)">${i}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${i}</div>`;
                 }
                 container.innerHTML = html;
             } else {
@@ -456,7 +512,7 @@
                     for(let seat = 1; seat <= conf.seats; seat++) {
                         const seatStr = `${col}列${seat}番`;
                         const ticket = getTicket(currentVenue, blockCode, seatStr);
-                        html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="selectSeat('${seatStr}', this)">${seat}</div>`;
+                        html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
                     }
                 }
                 container.innerHTML = html;
@@ -471,7 +527,7 @@
                 for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
                     const seatStr = `${col}排${seat}座`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="selectSeat('${seatStr}', this)">${seat}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
                 }
             }
             container.innerHTML = html;
@@ -489,7 +545,7 @@
                 for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
                     const seatStr = `${label}${seat}番`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="selectSeat('${seatStr}', this)">${seat}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
                 }
             }
             container.innerHTML = html;
@@ -502,60 +558,61 @@
         return allTickets.find(t => t.show === show && t.seat && t.seat.includes(seatStr) && t.note && t.note.includes(`BLOCK:${block}`));
     }
 
-    function selectSeat(seatStr, el) {
-        document.querySelectorAll('.seat-node').forEach(node => node.classList.remove('selected'));
-        el.classList.add('selected');
-        currentSelectedSeat = seatStr;
-
-        const ticket = getTicket(currentVenue, currentBlock, seatStr);
-        if (ticket) {
-            document.getElementById('set-status').value = ticket.status;
-            document.getElementById('set-buyer').value = ticket.buyer || '';
-            document.getElementById('set-price').value = ticket.price || '';
+    // 💡 支持多选/取消多选
+    function toggleSeatSelect(seatStr, el) {
+        const index = selectedSeatsArray.indexOf(seatStr);
+        if (index > -1) {
+            selectedSeatsArray.splice(index, 1);
+            el.classList.remove('selected');
         } else {
-            document.getElementById('set-buyer').value = '';
-            document.getElementById('set-price').value = '';
+            selectedSeatsArray.push(seatStr);
+            el.classList.add('selected');
         }
     }
 
-    async function saveSeatTicket() {
+    // 批量保存当前多选的座位为同一张票据（1连或2连）
+    async function saveSeatTicketsMulti() {
         const operator = getOperatorName();
         if (!operator) return;
-        if (!currentSelectedSeat) { alert('请先点击选中一个座位！'); return; }
+        if (selectedSeatsArray.length === 0) { alert('请先点击选中至少一个座位！'); return; }
 
         const status = document.getElementById('set-status').value;
-        const buyer = document.getElementById('set-buyer').value;
-        const price = document.getElementById('set-price').value;
+        const buyer = document.getElementById('set-buyer').value.trim();
+        const price = document.getElementById('set-price').value.trim();
+        const combinedSeats = selectedSeatsArray.join(',');
+        const typeStr = selectedSeatsArray.length > 1 ? '2连番' : '单人票';
 
-        const existing = getTicket(currentVenue, currentBlock, currentSelectedSeat);
+        await _supabase.from('tickets').insert([{
+            show: currentVenue,
+            seat: combinedSeats,
+            status: status,
+            buyer: buyer,
+            price: price,
+            note: `[BLOCK:${currentBlock}][本土票][${typeStr}]`
+        }]);
 
-        if (existing) {
-            await _supabase.from('tickets').update({ status, buyer, price }).eq('id', existing.id);
-            await addLog('修改座位票', `更新【${currentVenue} ${currentBlock} ${currentSelectedSeat}】`);
-        } else {
-            await _supabase.from('tickets').insert([{ show: currentVenue, seat: currentSelectedSeat, status, buyer, price, note: `[BLOCK:${currentBlock}][本土票][单人票]` }]);
-            await addLog('打点录票', `新增【${currentVenue} ${currentBlock} ${currentSelectedSeat}】`);
-        }
-
+        await addLog('打点多选录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
+        
         fetchTickets();
         openSeatModal(currentBlock);
     }
 
-    async function deleteSeatTicket() {
+    async function deleteSeatTicketsMulti() {
         const operator = getOperatorName();
         if (!operator) return;
-        if (!currentSelectedSeat) { alert('请先选中座位！'); return; }
+        if (selectedSeatsArray.length === 0) { alert('请先选中要清除的座位！'); return; }
 
-        const existing = getTicket(currentVenue, currentBlock, currentSelectedSeat);
-        if (existing) {
-            await _supabase.from('tickets').delete().eq('id', existing.id);
-            await addLog('删除票据', `删除【${currentVenue} ${currentBlock} ${currentSelectedSeat}】`);
-            fetchTickets();
-            openSeatModal(currentBlock);
+        for (let seatStr of selectedSeatsArray) {
+            const existing = getTicket(currentVenue, currentBlock, seatStr);
+            if (existing) {
+                await _supabase.from('tickets').delete().eq('id', existing.id);
+            }
         }
+        await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】的座位记录: ${selectedSeatsArray.join(',')}`);
+        fetchTickets();
+        openSeatModal(currentBlock);
     }
 
-    // 🔒 密码 3939 彻底清空当前场馆的所有票据
     async function clearCurrentVenueTickets() {
         const operator = getOperatorName();
         if (!operator) return;
