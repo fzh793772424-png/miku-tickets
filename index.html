@@ -15,7 +15,7 @@
         .legend-item { display: flex; align-items: center; gap: 5px; }
         .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
         
-        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .map-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .stage { background: #333; color: white; text-align: center; padding: 6px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; margin-bottom: 12px; }
         
@@ -46,14 +46,12 @@
         <span id="sync-status" style="font-size: 0.8rem;">🔄 连接中...</span>
     </header>
 
-    <!-- 图例 -->
     <div class="legend">
         <div class="legend-item"><span class="dot status-在手"></span> 在手</div>
         <div class="legend-item"><span class="dot status-预定"></span> 预定</div>
         <div class="legend-item"><span class="dot status-已出"></span> 已出</div>
     </div>
 
-    <!-- 图形看板：广岛 -> 大阪 -> 东京 -->
     <div class="stage-map-container">
         <!-- 广岛场 -->
         <div class="map-card">
@@ -122,7 +120,7 @@
         </div>
     </div>
 
-    <!-- 录入/改票表单 -->
+    <!-- 录入票据 -->
     <div class="form-box">
         <h3>➕ 录入票据</h3>
         <div class="form-grid">
@@ -153,7 +151,7 @@
 
 <script>
     const SUPABASE_URL = 'https://matckyhwzjwmdazpqzgx.supabase.co';
-    const SUPABASE_KEY = 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let allTickets = [];
@@ -163,15 +161,20 @@
         _supabase.channel('custom-all-channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets())
             .subscribe((status) => {
-                if (status === 'SUBSCRIBED') document.getElementById('sync-status').innerText = '🟢 实时同步中';
+                if (status === 'SUBSCRIBED') {
+                    document.getElementById('sync-status').innerText = '🟢 实时同步中';
+                } else {
+                    document.getElementById('sync-status').innerText = '🟡 尝试连接...';
+                }
             });
     }
 
     async function fetchTickets() {
-        const { data } = await _supabase.from('tickets').select('*');
+        const { data, error } = await _supabase.from('tickets').select('*');
         if (data) {
             allTickets = data;
             renderMap();
+            document.getElementById('sync-status').innerText = '🟢 实时同步中';
         }
     }
 
@@ -216,6 +219,7 @@
         if (action) {
             const nextStatus = ticket.status === '在手' ? '预定' : (ticket.status === '预定' ? '已出' : '在手');
             await _supabase.from('tickets').update({ status: nextStatus }).eq('id', ticket.id);
+            fetchTickets();
         }
     }
 
@@ -232,13 +236,17 @@
 
         note = `[${type}] ${note}`;
 
-        await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
-        document.getElementById('in-seat').value = '';
-        document.getElementById('in-note').value = '';
+        const { error } = await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
+        if (error) {
+            alert('保存失败，请检查数据库设置');
+        } else {
+            document.getElementById('in-seat').value = '';
+            document.getElementById('in-note').value = '';
+            fetchTickets();
+        }
     }
 
     init();
 </script>
 </body>
-</html> 
-
+</html>
