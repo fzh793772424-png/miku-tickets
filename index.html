@@ -3,185 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magical Mirai 票务实时协作后台</title>
+    <title>Magical Mirai 票务图形看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --miku: #39C5BB; --miku-dark: #1f7871; --bg: #f4f7f6; }
+        :root { --miku: #39C5BB; --bg: #f4f7f6; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; }
+        .container { max-width: 1000px; margin: 0 auto; }
         header { background: var(--miku); color: white; padding: 15px 20px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
-        h1 { margin: 0; font-size: 1.2rem; }
-        .map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0; }
-        .map-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
-        .stage { background: #333; color: white; padding: 4px; border-radius: 4px; font-size: 0.8rem; margin-bottom: 10px; }
-        .area-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.8rem; }
-        .area { background: #eef9f8; padding: 8px; border-radius: 4px; border: 1px dashed var(--miku); }
-        .form-box { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        .legend { display: flex; gap: 15px; justify-content: center; margin: 15px 0; font-size: 0.85rem; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+        
+        .stage-map-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .map-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .stage { background: #333; color: white; text-align: center; padding: 6px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; margin-bottom: 12px; }
+        
+        .seat-section { margin-top: 10px; }
+        .section-title { font-size: 0.75rem; color: #666; margin-bottom: 5px; text-align: center; }
+        .seat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        
+        .seat-node { border-radius: 5px; padding: 8px 4px; text-align: center; font-size: 0.75rem; color: white; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        .seat-node:active { transform: scale(0.95); }
+        .status-在手 { background-color: #2ec4b6; }
+        .status-预定 { background-color: #ff9f1c; }
+        .status-已出 { background-color: #e71d36; }
+        
+        .form-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
         input, select, button { padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
         button { background: var(--miku); color: white; border: none; font-weight: bold; cursor: pointer; }
-        .filters { display: flex; gap: 10px; margin-bottom: 15px; }
-        .ticket-list { display: grid; gap: 10px; }
-        .ticket-item { background: white; padding: 12px 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
-        .status-在手 { border-left-color: #2ec4b6; }
-        .status-预定 { border-left-color: #ff9f1c; }
-        .status-已出 { border-left-color: #e71d36; }
-        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; color: white; font-weight: bold; }
-        .bg-在手 { background: #2ec4b6; }
-        .bg-预定 { background: #ff9f1c; }
-        .bg-已出 { background: #e71d36; }
-        .action-btn { background: none; border: none; color: #888; font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h1>⚡ Magical Mirai 实时票务看板</h1>
+        <h2>⚡ Ticket Map 座位图形看板</h2>
         <span id="sync-status" style="font-size: 0.8rem;">🔄 连接中...</span>
     </header>
 
-    <!-- 三场座位简易视图 -->
-    <div class="map-container">
+    <!-- 图例 -->
+    <div class="legend">
+        <div class="legend-item"><span class="dot status-在手"></span> 在手</div>
+        <div class="legend-item"><span class="dot status-预定"></span> 预定</div>
+        <div class="legend-item"><span class="dot status-已出"></span> 已出</div>
+    </div>
+
+    <!-- 图形化座位展示区 -->
+    <div class="stage-map-container">
+        <!-- 大阪场 -->
         <div class="map-card">
-            <h3>大阪场</h3>
-            <div class="stage">STAGE 舞台</div>
-            <div class="area-grid">
-                <div class="area">SS区<br><b id="cnt-大阪-SS">0</b>张</div>
-                <div class="area">S/A区<br><b id="cnt-大阪-其他">0</b>张</div>
+            <h3 style="text-align: center; margin-top:0;">大阪场</h3>
+            <div class="stage">STAGE 舞台 FRONT</div>
+            <div class="seat-section">
+                <div class="section-title">--- SS 区 ---</div>
+                <div id="grid-大阪场-SS" class="seat-grid"></div>
+            </div>
+            <div class="seat-section">
+                <div class="section-title">--- S / A 区 ---</div>
+                <div id="grid-大阪场-其他" class="seat-grid"></div>
             </div>
         </div>
+
+        <!-- 东京 Day1 -->
         <div class="map-card">
-            <h3>东京 Day1</h3>
-            <div class="stage">STAGE 舞台</div>
-            <div class="area-grid">
-                <div class="area">SS区<br><b id="cnt-东京1-SS">0</b>张</div>
-                <div class="area">S/A区<br><b id="cnt-东京1-其他">0</b>张</div>
+            <h3 style="text-align: center; margin-top:0;">东京 Day1</h3>
+            <div class="stage">STAGE 舞台 FRONT</div>
+            <div class="seat-section">
+                <div class="section-title">--- SS 区 ---</div>
+                <div id="grid-东京 Day1-SS" class="seat-grid"></div>
+            </div>
+            <div class="seat-section">
+                <div class="section-title">--- S / A 区 ---</div>
+                <div id="grid-东京 Day1-其他" class="seat-grid"></div>
             </div>
         </div>
+
+        <!-- 东京 Day2 -->
         <div class="map-card">
-            <h3>东京 Day2</h3>
-            <div class="stage">STAGE 舞台</div>
-            <div class="area-grid">
-                <div class="area">SS区<br><b id="cnt-东京2-SS">0</b>张</div>
-                <div class="area">S/A区<br><b id="cnt-东京2-其他">0</b>张</div>
+            <h3 style="text-align: center; margin-top:0;">东京 Day2</h3>
+            <div class="stage">STAGE 舞台 FRONT</div>
+            <div class="seat-section">
+                <div class="section-title">--- SS 区 ---</div>
+                <div id="grid-东京 Day2-SS" class="seat-grid"></div>
+            </div>
+            <div class="seat-section">
+                <div class="section-title">--- S / A 区 ---</div>
+                <div id="grid-东京 Day2-其他" class="seat-grid"></div>
             </div>
         </div>
     </div>
 
-    <!-- 录入面板 -->
+    <!-- 快速录入/改票 -->
     <div class="form-box">
-        <h3>➕ 快速录入 / 补票</h3>
+        <h3>➕ 录入/更新票务</h3>
         <div class="form-grid">
             <select id="in-show">
                 <option value="大阪场">大阪场</option>
                 <option value="东京 Day1">东京 Day1</option>
                 <option value="东京 Day2">东京 Day2</option>
             </select>
-            <input type="text" id="in-seat" placeholder="位置 (例: SS区 5排)">
+            <input type="text" id="in-seat" placeholder="位置 (例: SS 5排12)">
             <select id="in-status">
-                <option value="在手">在手 (未出)</option>
-                <option value="预定">预定 (定金)</option>
+                <option value="在手">在手</option>
+                <option value="预定">预定</option>
                 <option value="已出">已出</option>
             </select>
             <input type="text" id="in-price" placeholder="价格">
             <input type="text" id="in-buyer" placeholder="买家/对接人">
             <input type="text" id="in-note" placeholder="备注">
-            <button onclick="addTicket()">提交保存</button>
+            <button onclick="addTicket()">保存票据</button>
         </div>
     </div>
-
-    <!-- 筛选过滤 -->
-    <div class="filters">
-        <button onclick="filterStatus('全部')">全部展示</button>
-        <button onclick="filterStatus('在手')" style="background:#2ec4b6;">只看在手</button>
-        <button onclick="filterStatus('预定')" style="background:#ff9f1c;">只看预定</button>
-        <button onclick="filterStatus('已出')" style="background:#e71d36;">只看已出</button>
-    </div>
-
-    <!-- 票务明细列表 -->
-    <div id="ticket-list" class="ticket-list">加载中...</div>
 </div>
 
 <script>
-    // 填入你的 Supabase 配置
     const SUPABASE_URL = 'https://matckyhwzjwmdazpqzgx.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
+    const SUPABASE_KEY = 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let allTickets = [];
-    let currentFilter = '全部';
 
-    // 初始化获取数据并开启实时监听
     async function init() {
         fetchTickets();
         _supabase.channel('custom-all-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
-                fetchTickets();
-            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets())
             .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    document.getElementById('sync-status').innerText = '🟢 实时同步中';
-                }
+                if (status === 'SUBSCRIBED') document.getElementById('sync-status').innerText = '🟢 实时同步中';
             });
     }
 
-    // 从数据库拉取最新票务
     async function fetchTickets() {
-        const { data, error } = await _supabase.from('tickets').select('*').order('id', { ascending: false });
-        if (!error) {
+        const { data } = await _supabase.from('tickets').select('*');
+        if (data) {
             allTickets = data;
-            render();
+            renderMap();
         }
     }
 
-    // 渲染页面
-    function render() {
-        const listEl = document.getElementById('ticket-list');
-        listEl.innerHTML = '';
-
-        let filtered = currentFilter === '全部' ? allTickets : allTickets.filter(t => t.status === currentFilter);
-
-        filtered.forEach(t => {
-            const item = document.createElement('div');
-            item.className = `ticket-item status-${t.status}`;
-            item.innerHTML = `
-                <div>
-                    <strong>[${t.show}] ${t.seat || '未填写座位'}</strong>
-                    <span class="badge bg-${t.status}">${t.status}</span><br>
-                    <small style="color:#666;">💰 ${t.price || '未标价'} | 👤 ${t.buyer || '无'} | 📝 ${t.note || '无备注'}</small>
-                </div>
-                <div>
-                    <select onchange="updateStatus(${t.id}, this.value)" style="font-size:0.75rem; padding:3px;">
-                        <option value="在手" ${t.status==='在手'?'selected':''}>设为在手</option>
-                        <option value="预定" ${t.status==='预定'?'selected':''}>设为预定</option>
-                        <option value="已出" ${t.status==='已出'?'selected':''}>设为已出</option>
-                    </select>
-                    <button class="action-btn" onclick="deleteTicket(${t.id})">删除</button>
-                </div>
-            `;
-            listEl.appendChild(item);
+    function renderMap() {
+        const containers = ['大阪场-SS', '大阪场-其他', '东京 Day1-SS', '东京 Day1-其他', '东京 Day2-SS', '东京 Day2-其他'];
+        containers.forEach(id => {
+            const el = document.getElementById(`grid-${id}`);
+            if(el) el.innerHTML = '';
         });
 
-        updateStats();
-    }
-
-    // 更新区域统计
-    function updateStats() {
-        const counts = { '大阪-SS': 0, '大阪-其他': 0, '东京1-SS': 0, '东京1-其他': 0, '东京2-SS': 0, '东京2-其他': 0 };
         allTickets.forEach(t => {
-            if (t.status === '在手') {
-                let keyShow = t.show.includes('大阪') ? '大阪' : (t.show.includes('Day1') ? '东京1' : '东京2');
-                let keyArea = t.seat && t.seat.includes('SS') ? 'SS' : '其他';
-                counts[`${keyShow}-${keyArea}`]++;
+            const isSS = t.seat && t.seat.toUpperCase().includes('SS');
+            const targetGridId = `grid-${t.show}-${isSS ? 'SS' : '其他'}`;
+            const gridEl = document.getElementById(targetGridId);
+
+            if (gridEl) {
+                const node = document.createElement('div');
+                node.className = `seat-node status-${t.status}`;
+                node.innerText = t.seat || '未命名';
+                node.title = `买家: ${t.buyer||'无'}\n价格: ${t.price||'无'}\n备注: ${t.note||'无'}`;
+                node.onclick = () => handleSeatClick(t);
+                gridEl.appendChild(node);
             }
         });
-        for (let k in counts) {
-            if(document.getElementById(`cnt-${k}`)) document.getElementById(`cnt-${k}`).innerText = counts[k];
+    }
+
+    async function handleSeatClick(ticket) {
+        const action = confirm(`【${ticket.show} - ${ticket.seat}】\n状态: ${ticket.status}\n买家: ${ticket.buyer||'无'}\n价格: ${ticket.price||'无'}\n备注: ${ticket.note||'无'}\n\n按“确定”切换状态（在手->预定->已出），按“取消”不做更改。`);
+        if (action) {
+            const nextStatus = ticket.status === '在手' ? '预定' : (ticket.status === '预定' ? '已出' : '在手');
+            await _supabase.from('tickets').update({ status: nextStatus }).eq('id', ticket.id);
         }
     }
 
-    // 动作：添加票
     async function addTicket() {
         const show = document.getElementById('in-show').value;
         const seat = document.getElementById('in-seat').value;
@@ -190,26 +181,11 @@
         const buyer = document.getElementById('in-buyer').value;
         const note = document.getElementById('in-note').value;
 
+        if(!seat) { alert('请填写座位位置！'); return; }
+
         await _supabase.from('tickets').insert([{ show, seat, status, price, buyer, note }]);
         document.getElementById('in-seat').value = '';
         document.getElementById('in-note').value = '';
-    }
-
-    // 动作：改状态
-    async function updateStatus(id, newStatus) {
-        await _supabase.from('tickets').update({ status: newStatus }).eq('id', id);
-    }
-
-    // 动作：删除票
-    async function deleteTicket(id) {
-        if(confirm('确认删除这张票的记录？')) {
-            await _supabase.from('tickets').delete().eq('id', id);
-        }
-    }
-
-    function filterStatus(status) {
-        currentFilter = status;
-        render();
     }
 
     init();
