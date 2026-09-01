@@ -50,8 +50,22 @@
         <div class="legend-item"><span class="dot status-已出"></span> 已出</div>
     </div>
 
-    <!-- 图形化座位展示区 -->
+    <!-- 图形化座位展示区（从左到右：广岛 -> 大阪 -> 东京） -->
     <div class="stage-map-container">
+        <!-- 广岛场 -->
+        <div class="map-card">
+            <h3 style="text-align: center; margin-top:0;">广岛场</h3>
+            <div class="stage">STAGE 舞台 FRONT</div>
+            <div class="seat-section">
+                <div class="section-title">--- SS 区 ---</div>
+                <div id="grid-广岛场-SS" class="seat-grid"></div>
+            </div>
+            <div class="seat-section">
+                <div class="section-title">--- S / A 区 ---</div>
+                <div id="grid-广岛场-其他" class="seat-grid"></div>
+            </div>
+        </div>
+
         <!-- 大阪场 -->
         <div class="map-card">
             <h3 style="text-align: center; margin-top:0;">大阪场</h3>
@@ -66,31 +80,17 @@
             </div>
         </div>
 
-        <!-- 东京 Day1 -->
+        <!-- 东京场 -->
         <div class="map-card">
-            <h3 style="text-align: center; margin-top:0;">东京 Day1</h3>
+            <h3 style="text-align: center; margin-top:0;">东京场</h3>
             <div class="stage">STAGE 舞台 FRONT</div>
             <div class="seat-section">
                 <div class="section-title">--- SS 区 ---</div>
-                <div id="grid-东京 Day1-SS" class="seat-grid"></div>
+                <div id="grid-东京场-SS" class="seat-grid"></div>
             </div>
             <div class="seat-section">
                 <div class="section-title">--- S / A 区 ---</div>
-                <div id="grid-东京 Day1-其他" class="seat-grid"></div>
-            </div>
-        </div>
-
-        <!-- 东京 Day2 -->
-        <div class="map-card">
-            <h3 style="text-align: center; margin-top:0;">东京 Day2</h3>
-            <div class="stage">STAGE 舞台 FRONT</div>
-            <div class="seat-section">
-                <div class="section-title">--- SS 区 ---</div>
-                <div id="grid-东京 Day2-SS" class="seat-grid"></div>
-            </div>
-            <div class="seat-section">
-                <div class="section-title">--- S / A 区 ---</div>
-                <div id="grid-东京 Day2-其他" class="seat-grid"></div>
+                <div id="grid-东京场-其他" class="seat-grid"></div>
             </div>
         </div>
     </div>
@@ -100,9 +100,9 @@
         <h3>➕ 录入/更新票务</h3>
         <div class="form-grid">
             <select id="in-show">
+                <option value="广岛场">广岛场</option>
                 <option value="大阪场">大阪场</option>
-                <option value="东京 Day1">东京 Day1</option>
-                <option value="东京 Day2">东京 Day2</option>
+                <option value="东京场">东京场</option>
             </select>
             <input type="text" id="in-seat" placeholder="位置 (例: SS 5排12)">
             <select id="in-status">
@@ -143,7 +143,7 @@
     }
 
     function renderMap() {
-        const containers = ['大阪场-SS', '大阪场-其他', '东京 Day1-SS', '东京 Day1-其他', '东京 Day2-SS', '东京 Day2-其他'];
+        const containers = ['广岛场-SS', '广岛场-其他', '大阪场-SS', '大阪场-其他', '东京场-SS', '东京场-其他'];
         containers.forEach(id => {
             const el = document.getElementById(`grid-${id}`);
             if(el) el.innerHTML = '';
