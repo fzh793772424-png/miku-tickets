@@ -19,12 +19,18 @@
         .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .operator-bar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #00796b; }
         
-        .stats-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; text-align: center; }
+        .stats-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; text-align: center; }
         .stat-box { background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
         .stat-num { font-size: 1.4rem; font-weight: bold; color: #333; margin-top: 4px; }
 
-        .quick-add-bar { background: #e0f2f1; padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid var(--miku); }
-        .quick-add-bar input, .quick-add-bar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .quick-add-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-top: 3px solid var(--miku); }
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .form-row input, .form-row select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+
+        .ticket-list-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .ticket-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+        .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 8px; text-align: center; }
+        .ticket-table th { background: #f4f6f7; font-weight: bold; }
 
         .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         .danger-btn:hover { background: #b80c21; }
@@ -40,7 +46,6 @@
         .block-box { border: 1px solid #dcdcdc; background: #fdfdfd; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; }
         .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
-        .block-info { font-size: 0.65rem; color: #777; margin-top: 2px; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
@@ -81,27 +86,61 @@
         <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 彻底清空【当前场馆】所有票据 (密码3939)</button>
     </div>
 
-    <!-- 📊 统计数据面板 -->
+    <!-- 📊 顶部数据看板 -->
     <div class="stats-card">
         <div class="stat-box"><div>总票数</div><div class="stat-num" id="stat-total">0</div></div>
         <div class="stat-box"><div style="color:#1b9aaa;">在手</div><div class="stat-num" id="stat-in-hand" style="color:#2ec4b6;">0</div></div>
         <div class="stat-box"><div style="color:#e58e00;">预定</div><div class="stat-num" id="stat-reserved" style="color:#ff9f1c;">0</div></div>
         <div class="stat-box"><div style="color:#b80c21;">已出</div><div class="stat-num" id="stat-sold" style="color:#e71d36;">0</div></div>
+        <div class="stat-box"><div>本土/海外</div><div class="stat-num" id="stat-source" style="font-size:1.1rem; margin-top:8px;">0 / 0</div></div>
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- ➕ 未出座号前的快速记票入口 -->
-    <div class="quick-add-bar">
-        <strong>🎫 出座号前·快速记票：</strong>
-        <input type="text" id="quick-block" placeholder="区域/Block(如: A3)" style="width:110px;">
-        <select id="quick-status">
-            <option value="在手">在手</option>
-            <option value="预定">预定</option>
-            <option value="已出">已出</option>
-        </select>
-        <input type="text" id="quick-buyer" placeholder="买家" style="width:90px;">
-        <input type="text" id="quick-price" placeholder="价格" style="width:80px;">
-        <button onclick="addQuickTicket()" style="background:var(--miku); color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">+ 录入无座票</button>
+    <!-- 🎫 出座号前：丰富记票表单 -->
+    <div class="quick-add-card">
+        <strong style="font-size:1rem; color:#00796b;">✍️ 出座号前·录入票据：</strong>
+        <div class="form-row">
+            <input type="text" id="quick-block" placeholder="区域/Block (如: A3)" style="width:130px;">
+            <select id="quick-source">
+                <option value="本土票">日本本土票</option>
+                <option value="海外票">海外先行票</option>
+            </select>
+            <select id="quick-type">
+                <option value="1">单人票 (1张)</option>
+                <option value="2">2 连番 (自动生成2张)</option>
+                <option value="3">3 连番 (自动生成3张)</option>
+                <option value="4">4 连番 (自动生成4张)</option>
+            </select>
+            <select id="quick-status">
+                <option value="在手">状态：在手</option>
+                <option value="预定">状态：预定</option>
+                <option value="已出">状态：已出</option>
+            </select>
+            <input type="text" id="quick-buyer" placeholder="买家(选填)" style="width:100px;">
+            <input type="text" id="quick-price" placeholder="单张价格(选填)" style="width:100px;">
+            <button onclick="addQuickTicket()" style="background:var(--miku); color:white; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">+ 确认录入</button>
+        </div>
+    </div>
+
+    <!-- 📋 票据明细与汇总列表（出座号前查看/挂载） -->
+    <div class="ticket-list-card">
+        <strong style="font-size:1rem;">📋 当前场馆票据明细（可在出座位后直接点“补填座位”挂载）</strong>
+        <table class="ticket-table">
+            <thead>
+                <tr>
+                    <th>区域 (Block)</th>
+                    <th>票源</th>
+                    <th>座位号 (出座后填写)</th>
+                    <th>状态</th>
+                    <th>买家</th>
+                    <th>价格</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="ticket-list-body">
+                <tr><td colspan="7" style="color:#999;">暂无录入票据</td></tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="legend">
@@ -126,7 +165,7 @@
     <div class="modal-content" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeModal()">&times;</span>
         <h3 id="modal-title" style="margin-top:0;">Block 座位详情</h3>
-        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">点击具体座位号设置/修改票据</div>
+        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">出座位后，也可直接在点阵图上点击选择设置/修改票据</div>
         
         <div id="seat-grid-container" class="seat-grid"></div>
 
@@ -261,7 +300,7 @@
     }
 
     function makeBlockHtml(code, label) {
-        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')"><div class="block-title">${label}</div><div class="block-info" id="badge-${code}">点击查看</div></div>`;
+        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')"><div class="block-title">${label}</div></div>`;
     }
 
     async function fetchTickets() {
@@ -281,6 +320,10 @@
         document.getElementById('stat-reserved').innerText = venueTickets.filter(t => t.status === '预定').length;
         document.getElementById('stat-sold').innerText = venueTickets.filter(t => t.status === '已出').length;
         
+        const domesticCount = venueTickets.filter(t => t.note && t.note.includes('本土票')).length;
+        const overseasCount = venueTickets.filter(t => t.note && t.note.includes('海外票')).length;
+        document.getElementById('stat-source').innerText = `${domesticCount} / ${overseasCount}`;
+
         let totalPrice = 0;
         venueTickets.forEach(t => {
             const p = parseFloat(t.price);
@@ -288,7 +331,38 @@
         });
         document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
-        // 2. 更新地图高亮
+        // 2. 渲染票据明细表格
+        const tbody = document.getElementById('ticket-list-body');
+        if (venueTickets.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="color:#999;">暂无数据</td></tr>`;
+        } else {
+            tbody.innerHTML = venueTickets.map(t => {
+                let blockCode = '未知';
+                if (t.note && t.note.includes('BLOCK:')) {
+                    const match = t.note.match(/BLOCK:([^\]]+)/);
+                    if (match) blockCode = match[1];
+                }
+                const source = (t.note && t.note.includes('海外票')) ? '🌏 海外票' : '🇯🇵 本土票';
+                const seatDisplay = t.seat ? `<strong style="color:var(--miku);">${t.seat}</strong>` : `<span style="color:#aaa;">未出/待补填</span>`;
+                
+                return `
+                    <tr>
+                        <td><strong>${blockCode}</strong></td>
+                        <td>${source}</td>
+                        <td>${seatDisplay}</td>
+                        <td><span class="dot bg-${t.status}"></span> ${t.status}</td>
+                        <td>${t.buyer || '-'}</td>
+                        <td>${t.price ? '¥' + t.price : '-'}</td>
+                        <td>
+                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${t.seat || ''}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填座位</button>
+                            <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 3. 更新地图高亮
         document.querySelectorAll('.block-box').forEach(el => el.classList.remove('bg-在手', 'bg-预定', 'bg-已出'));
         venueTickets.forEach(t => {
             let blockCode = '';
@@ -301,31 +375,64 @@
         });
     }
 
+    // 批量录入票据（自动处理连番）
     async function addQuickTicket() {
         const operator = getOperatorName();
         if (!operator) return;
 
         const block = document.getElementById('quick-block').value.trim();
+        const source = document.getElementById('quick-source').value;
+        const count = parseInt(document.getElementById('quick-type').value);
         const status = document.getElementById('quick-status').value;
         const buyer = document.getElementById('quick-buyer').value.trim();
         const price = document.getElementById('quick-price').value.trim();
 
-        if (!block) { alert('请至少填写区域 (Block)，如: A3'); return; }
+        if (!block) { alert('请填写区域 (Block)，如: A3'); return; }
 
-        await _supabase.from('tickets').insert([{
-            show: currentVenue,
-            seat: '',
-            status: status,
-            buyer: buyer,
-            price: price,
-            note: `[BLOCK:${block}]`
-        }]);
+        const insertData = [];
+        for (let i = 1; i <= count; i++) {
+            const lianfanTag = count > 1 ? `[${count}连番-${i}]` : '';
+            insertData.push({
+                show: currentVenue,
+                seat: '',
+                status: status,
+                buyer: buyer,
+                price: price,
+                note: `[BLOCK:${block}][${source}]${lianfanTag}`
+            });
+        }
 
-        await addLog('未出座录票', `新增【${currentVenue} ${block}区】 ${status} 票`);
+        await _supabase.from('tickets').insert(insertData);
+        await addLog('录入票据', `批量新增【${currentVenue} ${block}区】 ${count}张 (${source}, ${status})`);
+
         document.getElementById('quick-block').value = '';
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
         fetchTickets();
+    }
+
+    // 📌 出座后：在表格中补填/修改座位号
+    async function editSeatNumber(ticketId, blockCode, oldSeat) {
+        const operator = getOperatorName();
+        if (!operator) return;
+
+        const newSeat = prompt(`为【${currentVenue} ${blockCode}】补填具体座位号（如: 13列7番 或 1排23座）：`, oldSeat);
+        if (newSeat !== null) {
+            await _supabase.from('tickets').update({ seat: newSeat.trim() }).eq('id', ticketId);
+            await addLog('补填座位', `更新【${currentVenue} ${blockCode}】座位为: ${newSeat}`);
+            fetchTickets();
+        }
+    }
+
+    async function deleteSingleTicket(ticketId) {
+        const operator = getOperatorName();
+        if (!operator) return;
+
+        if (confirm('确定要删除这张票据记录吗？')) {
+            await _supabase.from('tickets').delete().eq('id', ticketId);
+            await addLog('删除票据', `删除单张票据记录 ID: ${ticketId}`);
+            fetchTickets();
+        }
     }
 
     function openSeatModal(blockCode) {
@@ -430,7 +537,7 @@
             await _supabase.from('tickets').update({ status, buyer, price }).eq('id', existing.id);
             await addLog('修改座位票', `更新【${currentVenue} ${currentBlock} ${currentSelectedSeat}】`);
         } else {
-            await _supabase.from('tickets').insert([{ show: currentVenue, seat: currentSelectedSeat, status, buyer, price, note: `[BLOCK:${currentBlock}]` }]);
+            await _supabase.from('tickets').insert([{ show: currentVenue, seat: currentSelectedSeat, status, buyer, price, note: `[BLOCK:${currentBlock}][本土票]` }]);
             await addLog('打点录票', `新增【${currentVenue} ${currentBlock} ${currentSelectedSeat}】`);
         }
 
