@@ -30,8 +30,12 @@
         .ticket-list-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .list-header-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
         .ticket-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 8px; text-align: center; }
+        .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 6px; text-align: center; }
         .ticket-table th { background: #f4f6f7; font-weight: bold; }
+
+        /* 表格内直接输入的样式 */
+        .table-input { width: 90%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem; }
+        .table-input:focus { border-color: var(--miku); outline: none; background: #e0f2f1; }
 
         .btn-action { background: var(--miku); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-action:hover { opacity: 0.9; }
@@ -67,6 +71,8 @@
 
         .log-box { background: white; padding: 15px; border-radius: 8px; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fafafa; padding: 8px; border: 1px solid #eee; }
+
+        .ticket-no-badge { background: #333; color: white; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
     </style>
 </head>
 <body>
@@ -152,13 +158,13 @@
         <table class="ticket-table">
             <thead>
                 <tr>
+                    <th>票据编号</th>
                     <th>区域 (Block)</th>
-                    <th>票源</th>
-                    <th>类型</th>
-                    <th>座位号</th>
-                    <th>状态 (快捷修改)</th>
-                    <th>买家</th>
-                    <th>价格</th>
+                    <th>票源 / 类型</th>
+                    <th>座位号 (直接修改)</th>
+                    <th>状态</th>
+                    <th>买家 (直接修改)</th>
+                    <th>价格 (直接修改)</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -387,8 +393,13 @@
         seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : s}">${s}</option>`).join('');
     }
 
+    // 💡 重点：按 created_at 正序拉取，防止修改状态后顺序颠倒
     async function fetchTickets() {
-        const { data } = await _supabase.from('tickets').select('*');
+        const { data } = await _supabase
+            .from('tickets')
+            .select('*')
+            .order('created_at', { ascending: true });
+            
         if (data) {
             allTickets = data;
             updateStatsAndHighlights();
@@ -445,11 +456,25 @@
         });
     }
 
-    // 📋 条件筛选渲染列表（已增加状态直接下拉修改功能）
+    // 📋 条件筛选与表格渲染（包含编号生成、直接输入框修改）
     function renderTicketTable() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
         const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+
+        // 自动计算每人/全局的编号（大瓜-1, 大瓜-2）
+        const userTicketCounters = {};
+        const ticketNoMap = {};
+
+        venueTickets.forEach(t => {
+            let opName = '票';
+            if (t.note && t.note.includes('BY:')) {
+                const match = t.note.match(/BY:([^\]]+)/);
+                if (match) opName = match[1];
+            }
+            userTicketCounters[opName] = (userTicketCounters[opName] || 0) + 1;
+            ticketNoMap[t.id] = `${opName}-${userTicketCounters[opName]}`;
+        });
 
         const filtered = venueTickets.filter(t => {
             let matchesStatus = true;
@@ -463,7 +488,8 @@
             if (keyword) {
                 matchesKW = (t.seat && t.seat.toLowerCase().includes(keyword)) ||
                             (t.buyer && t.buyer.toLowerCase().includes(keyword)) ||
-                            (t.note && t.note.toLowerCase().includes(keyword));
+                            (t.note && t.note.toLowerCase().includes(keyword)) ||
+                            (ticketNoMap[t.id] && ticketNoMap[t.id].toLowerCase().includes(keyword));
             }
             return matchesStatus && matchesKW;
         });
@@ -478,15 +504,14 @@
                     const match = t.note.match(/BLOCK:([^\]]+)/);
                     if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
                 }
-                const source = (t.note && t.note.includes('海外票')) ? '🌏 海外票' : '🇯🇵 本土票';
-                const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="background:#e0f2f1; color:#00796b; padding:2px 6px; border-radius:3px; font-weight:bold;">👭 2连番</span>` : `👤 单人票`;
-                const isUnassignedSeat = !t.seat || t.seat.includes('待分配');
-                const seatDisplay = !isUnassignedSeat ? `<strong style="color:var(--miku);">${t.seat}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 待出票/待分配</span>`;
-                const blockDisplay = blockCode !== '待分配' ? `<strong>${blockCode}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 未确定Block</span>`;
+                const source = (t.note && t.note.includes('海外票')) ? '🌏 海外' : '🇯🇵 本土';
+                const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="color:#00796b; font-weight:bold;">👭 2连</span>` : `👤 单人`;
+                const blockDisplay = blockCode !== '待分配' ? `<strong>${blockCode}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 待定</span>`;
+                const ticketNo = ticketNoMap[t.id] || '票-';
 
-                // 🆕 可直接切换状态的下拉框
+                // 快捷修改状态
                 const statusSelectHtml = `
-                    <select onchange="updateTicketStatus('${t.id}', this.value)" style="padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; background: white; cursor: pointer;">
+                    <select onchange="updateTicketField('${t.id}', 'status', this.value)" style="padding: 2px 4px; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; background: white; cursor: pointer;">
                         <option value="在手" ${t.status === '在手' ? 'selected' : ''}>🟢 在手</option>
                         <option value="预定" ${t.status === '预定' ? 'selected' : ''}>🟠 预定</option>
                         <option value="已出" ${t.status === '已出' ? 'selected' : ''}>🔴 已出</option>
@@ -495,15 +520,20 @@
 
                 return `
                     <tr>
+                        <td><span class="ticket-no-badge">${ticketNo}</span></td>
                         <td>${blockDisplay}</td>
-                        <td>${source}</td>
-                        <td>${typeDisplay}</td>
-                        <td>${seatDisplay}</td>
-                        <td>${statusSelectHtml}</td>
-                        <td>${t.buyer || '-'}</td>
-                        <td>${t.price ? '¥' + t.price : '-'}</td>
+                        <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <button onclick="editSeatNumber('${t.id}', '${blockCode}', '${isUnassignedSeat ? '' : t.seat}')" style="font-size:0.75rem; background:var(--miku); color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📌 补填/修改</button>
+                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待出票/分配" onchange="updateTicketField('${t.id}', 'seat', this.value)">
+                        </td>
+                        <td>${statusSelectHtml}</td>
+                        <td>
+                            <input type="text" class="table-input" value="${t.buyer || ''}" placeholder="无" onchange="updateTicketField('${t.id}', 'buyer', this.value)">
+                        </td>
+                        <td>
+                            <input type="text" class="table-input" value="${t.price || ''}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
+                        </td>
+                        <td>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
                         </td>
                     </tr>
@@ -512,20 +542,23 @@
         }
     }
 
-    // 🆕 直接切换表格中某条记录的状态
-    async function updateTicketStatus(ticketId, newStatus) {
+    // 💡 通用更新字段函数（修改座位、状态、买家、价格直接保存）
+    async function updateTicketField(ticketId, field, value) {
         const operator = getOperatorName();
         if (!operator) {
             fetchTickets();
             return;
         }
 
-        const { error } = await _supabase.from('tickets').update({ status: newStatus }).eq('id', ticketId);
+        const updateData = {};
+        updateData[field] = value.trim();
+
+        const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
 
         if (error) {
-            alert('修改状态失败：' + error.message);
+            alert('更新失败：' + error.message);
         } else {
-            await addLog('修改状态', `快速修改票据 [ID: ${ticketId}] 状态为: ${newStatus}`);
+            await addLog('修改信息', `修改票据 [ID: ${ticketId}] 的 ${field} 为: ${value}`);
             fetchTickets();
         }
     }
@@ -556,7 +589,7 @@
             status: status,
             buyer: buyer,
             price: price,
-            note: `[BLOCK:${block}][${source}][${type}]`
+            note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]);
 
         const blockLogStr = block !== 'UNASSIGNED' ? `${block}区` : '未确定Block';
@@ -565,35 +598,6 @@
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
         fetchTickets();
-    }
-
-    async function editSeatNumber(ticketId, oldBlock, oldSeat) {
-        const operator = getOperatorName();
-        if (!operator) return;
-
-        const newDetail = prompt(`补填/修改票据信息（格式为 "Block,座位号"，如 "A1, 13列7番,8番" 或直接改座位号）：`, oldBlock !== '待分配' ? `${oldBlock}, ${oldSeat}` : '');
-        if (newDetail !== null && newDetail.trim() !== '') {
-            let parts = newDetail.split(',');
-            if (parts.length >= 2) {
-                const newBlock = parts[0].trim();
-                const newSeatStr = parts.slice(1).join(',').trim();
-                
-                const currentT = allTickets.find(t => t.id === ticketId);
-                let newNote = currentT ? currentT.note : '';
-                if (newNote.includes('BLOCK:')) {
-                    newNote = newNote.replace(/BLOCK:[^\]]+/, `BLOCK:${newBlock}`);
-                } else {
-                    newNote += `[BLOCK:${newBlock}]`;
-                }
-
-                await _supabase.from('tickets').update({ seat: newSeatStr, note: newNote }).eq('id', ticketId);
-                await addLog('补填座位', `更新【${currentVenue}】票据为 Block:${newBlock}, 座位:${newSeatStr}`);
-            } else {
-                await _supabase.from('tickets').update({ seat: newDetail.trim() }).eq('id', ticketId);
-                await addLog('补填座位', `更新【${currentVenue}】座位为: ${newDetail.trim()}`);
-            }
-            fetchTickets();
-        }
     }
 
     async function deleteSingleTicket(ticketId) {
@@ -711,7 +715,7 @@
             status: status,
             buyer: buyer,
             price: price,
-            note: `[BLOCK:${currentBlock}][本土票][${typeStr}]`
+            note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]);
 
         await addLog('打点多选录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
