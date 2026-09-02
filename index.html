@@ -111,7 +111,7 @@
 <div class="container">
     <!-- 初音横幅 -->
     <div class="miku-banner">
-        <img src="img/2.JPG" alt="Magical Mirai banner">
+        <img src="2.JPG" alt="Magical Mirai banner">
         <div class="banner-overlay">
             <div class="banner-title">🎤 Magical Mirai 2026<small>初音ミク ライブ チケット管理 ✧ みんなで協力！</small></div>
         </div>
@@ -130,7 +130,7 @@
     <div id="auth-overlay" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(20,25,30,0.86); justify-content:center; align-items:flex-start; padding:30px 15px; overflow-y:auto;">
         <div style="background:white; max-width:430px; width:100%; border-radius:12px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4); border-top: 6px solid var(--miku);">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
-                <img src="img/1.JPG" alt="miku" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:3px solid var(--miku); box-shadow:0 3px 10px rgba(57,197,187,0.5);">
+                <img src="1.JPG" alt="miku" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:3px solid var(--miku); box-shadow:0 3px 10px rgba(57,197,187,0.5);">
                 <div>
                     <h2 style="margin:0; color:#00796b;">🎵 Miku 20th 座位看板</h2>
                     <p style="margin:2px 0 0; color:#999; font-size:0.8rem;">✧ みんなで協力して 39 (サンキュー) ✧</p>
@@ -317,6 +317,19 @@
         <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
         <h3 id="history-modal-title" style="margin-top:0;">📜 票据历史记录</h3>
         <div id="history-modal-body" style="font-size:0.9rem;"></div>
+    </div>
+</div>
+
+<!-- 转票 Modal -->
+<div id="transferModal" class="modal" onclick="closeTransferModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width:430px;">
+        <span class="close-btn" onclick="closeTransferModal()">&times;</span>
+        <h3 id="transfer-modal-title" style="margin-top:0;">↔️ 转票给团员</h3>
+        <div id="transfer-info" style="font-size:0.85rem; color:#666; margin-bottom:10px;"></div>
+        <label style="font-weight:bold; font-size:0.9rem;">转给谁：</label>
+        <select id="transfer-select" style="width:100%; padding:9px; margin:6px 0 14px; border:1px solid #ccc; border-radius:6px;"></select>
+        <button class="btn-action" style="width:100%; padding:10px; font-size:1rem;" onclick="doTransferTicket()">✅ 确认转让</button>
+        <p style="font-size:0.8rem; color:#999; margin:10px 0 0;">转让后此票计入对方名下，操作日志与票据历史都会记录这次转让。</p>
     </div>
 </div>
 
@@ -909,6 +922,64 @@
     }
     function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
 
+    // ===== ↔️ 转票：把票归属人(BY)改成别的团员 =====
+    let transferTicketId = null;
+
+    function openTransferModal(ticketId) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        const t = findTicketById(ticketId);
+        if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+
+        const fromName = operatorOf(t) || '未署名';
+        transferTicketId = t.id;
+        document.getElementById('transfer-modal-title').innerText = `↔️ 转票 · ${ticketDesc(t)}`;
+        document.getElementById('transfer-info').innerHTML = `当前归属：<b>${esc(fromName)}</b>　操作人：<b>${esc(operator)}</b>`;
+
+        const sel = document.getElementById('transfer-select');
+        // 可选接收人：ALLOWED_NAMES 里排除当前归属人
+        const candidates = ALLOWED_NAMES.filter(n => n !== fromName);
+        if (candidates.length === 0) {
+            sel.innerHTML = '<option value="">(无可转对象)</option>';
+        } else {
+            sel.innerHTML = candidates.map(n => `<option value="${n}">${n}</option>`).join('');
+        }
+        document.getElementById('transferModal').style.display = 'flex';
+    }
+
+    async function doTransferTicket() {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+        if (!transferTicketId) return;
+
+        const toName = document.getElementById('transfer-select').value;
+        if (!toName) { alert('请先选择接收人'); return; }
+
+        const t = findTicketById(transferTicketId);
+        if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        const fromName = operatorOf(t) || '';
+        if (fromName === toName) { alert('这张票本来就是这个人的，无需转让'); return; }
+
+        // 改 note 里的 BY:xxx
+        let updatedNote = t.note || '';
+        if (updatedNote.includes('BY:')) {
+            updatedNote = updatedNote.replace(/BY:[^\]]+/, `BY:${toName}`);
+        } else {
+            updatedNote += `[BY:${toName}]`;
+        }
+
+        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', t.id);
+        if (error) { alert('转票失败：' + error.message); return; }
+
+        await addLog('转票', `将 ${ticketDesc(t)} 转给 ${toName}`, t.id);
+        alert(`✅ 已把票转给 ${toName}！`);
+        closeTransferModal();
+        fetchTickets();
+    }
+
+    function closeTransferModal() { document.getElementById('transferModal').style.display = 'none'; }
+
     // 区块颜色优先级：已出 > 预定 > 在手（防止多条记录互相覆盖导致颜色随机）
     const STATUS_PRIORITY = { '已出': 3, '预定': 2, '在手': 1 };
 
@@ -1058,7 +1129,8 @@
                         <td>
                             <input type="text" class="table-input" value="${esc(t.price)}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
                         </td>
-                        <td>
+                        <td style="white-space:nowrap;">
+                            <button onclick="openTransferModal('${t.id}')" style="font-size:0.75rem; background:#00897b; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">↔️ 转</button>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
                         </td>
                         <td>
