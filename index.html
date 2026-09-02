@@ -278,7 +278,7 @@
                 <option value="本土票">日本本土票</option>
                 <option value="海外票">海外先行票</option>
             </select>
-            <select id="quick-type">
+            <select id="quick-type" onchange="updateCurrencyDisplay()">
                 <option value="单人票">单人票</option>
                 <option value="2连番">2 连番</option>
             </select>
@@ -287,11 +287,11 @@
                 <option value="预定">状态：预定</option>
                 <option value="已出">状态：已出</option>
             </select>
-            <select id="quick-currency" onchange="updateCurrencyDisplay()">
-                <option value="CNY">人民币</option>
-                <option value="JPY">日元</option>
+            <select id="quick-currency" onchange="updateCurrencyDisplay()" title="选币种自动带默认价，可改">
+                <option value="CNY">CNY 人民币</option>
+                <option value="JPY">JPY 日元</option>
             </select>
-            <input type="text" id="quick-price" placeholder="金额(选填)" style="width:90px;">
+            <input type="text" id="quick-price" placeholder="CNY 500" style="width:90px;" oninput="document.getElementById('quick-price').dataset.auto='0'">
             <input type="text" id="quick-buyer" placeholder="买家(选填)" style="width:100px;">
             <button onclick="addQuickTicket()" class="btn-action">+ 确认录入</button>
         </div>
@@ -400,11 +400,11 @@
                 <option value="预定">标记为：预定</option>
                 <option value="已出">标记为：已出</option>
             </select>
-            <select id="set-currency">
-                <option value="CNY">¥人民币</option>
-                <option value="JPY">JP¥日元</option>
+            <select id="set-currency" onchange="updateSeatCurrencyDisplay()">
+                <option value="CNY">CNY 人民币</option>
+                <option value="JPY">JPY 日元</option>
             </select>
-            <input type="text" id="set-price" placeholder="金额(选填)" style="width:90px;">
+            <input type="text" id="set-price" placeholder="CNY 500" style="width:90px;" oninput="document.getElementById('set-price').dataset.autoEdited='1'">
             <input type="text" id="set-buyer" placeholder="买家(选填)" style="width:100px;">
             <button onclick="saveSeatTicketsMulti()" class="btn-action">保存选中座位</button>
             <button onclick="deleteSeatTicketsMulti()" class="danger-btn" style="padding:6px 12px;">清除选中座位</button>
@@ -442,9 +442,9 @@
     function formatTicketPrice(p) {
         const r = parseTicketPrice(p);
         if (!r) return '';
-        if (!r.amt) return r.cur === 'JPY' ? 'JP¥0' : '¥0';
+        if (!r.amt) return r.cur === 'JPY' ? 'JPY 0' : 'CNY 0';
         const num = Number.isInteger(r.amt) ? r.amt : r.amt.toFixed(2);
-        return r.cur === 'JPY' ? 'JP¥' + num : '¥' + num;
+        return (r.cur === 'JPY' ? 'JPY ' : 'CNY ') + num;
     }
 
     // 把币种+金额转成存储格式
@@ -452,6 +452,37 @@
         const a = String(amt == null ? '' : amt).trim();
         if (!a) return '';
         return (cur === 'JPY' ? 'JPY:' : 'CNY:') + a;
+    }
+
+    // 默认票价（单张）：人民币 500 / 日元 11000（用户无需手输；可改）
+    function defaultAmount(cur) {
+        return cur === 'JPY' ? 11000 : 500;
+    }
+    // 整组默认价 = 单张价 × 张数（2连 = 每张 11000 → 22000）
+    function comboAmount(cur, qty) {
+        return defaultAmount(cur) * (qty > 1 ? qty : 1);
+    }
+
+    // 币种下拉变化时自动填默认金额
+    function updateCurrencyDisplay() {
+        const cur = document.getElementById('quick-currency').value;
+        const type = document.getElementById('quick-type').value;
+        const qty = type === '2连番' ? 2 : 1;
+        const priceEl = document.getElementById('quick-price');
+        if (!String(priceEl.value).trim() || priceEl.dataset.auto === '1') {
+            priceEl.value = comboAmount(cur, qty);
+            priceEl.dataset.auto = '1';
+        }
+        priceEl.placeholder = cur === 'JPY' ? 'JPY ' + comboAmount(cur, qty) : 'CNY ' + comboAmount(cur, qty);
+    }
+    function updateSeatCurrencyDisplay() {
+        const cur = document.getElementById('set-currency').value;
+        const qty = Math.max(1, selectedSeatsArray.length);
+        const priceEl = document.getElementById('set-price');
+        if (!priceEl.dataset.autoedited) {
+            priceEl.value = comboAmount(cur, qty);
+        }
+        priceEl.placeholder = cur === 'JPY' ? 'JPY ' + comboAmount(cur, qty) : 'CNY ' + comboAmount(cur, qty);
     }
 
     // 把一条记录的座位字段拆成座位数组（精确匹配用，避免 "5番" 误匹配 "15番"）
@@ -656,6 +687,9 @@
     };
 
     function init() {
+        // 快速录入价格：默认人民币 500（单人），切币种/类型自动跟随；可手改
+        const qp = document.getElementById('quick-price');
+        if (qp) { qp.dataset.auto = '1'; qp.value = defaultAmount('CNY'); }
         renderCurrentVenue();   // 先画好场馆布局（纯静态，不涉及数据）
         refreshAuthUI();        // 检查登录状态，决定显示登录页还是看板
     }
@@ -916,9 +950,9 @@
 
     function formatReceivable(m) {
         const parts = [];
-        if (m.cny) parts.push('¥' + m.cny);
-        if (m.jpy) parts.push('JP¥' + m.jpy);
-        return parts.join(' + ') || '¥0';
+        if (m.cny) parts.push('CNY ' + m.cny);
+        if (m.jpy) parts.push('JPY ' + m.jpy);
+        return parts.join(' + ') || 'CNY 0';
     }
 
     function renderPool() {
@@ -1289,15 +1323,15 @@
                     </select>
                 `;
 
-                // 价格：币种 + 金额（直接改）
+                // 价格：币种下拉（选 CNY/JPY 自动给默认价 500/11000）+ 金额（可改）
                 const pr = parseTicketPrice(t.price) || { cur: 'CNY', amt: null };
                 const priceHtml = `
                     <span style="display:inline-flex; align-items:center; gap:2px;">
-                        <select class="table-select" style="padding:2px 2px; font-size:0.72rem;" onchange="updateTicketPrice('${t.id}', this.value, document.getElementById('price-amt-${t.id}').value)">
-                            <option value="CNY" ${pr.cur === 'CNY' ? 'selected' : ''}>¥</option>
-                            <option value="JPY" ${pr.cur === 'JPY' ? 'selected' : ''}>JP¥</option>
+                        <select class="table-select" style="padding:2px 2px; font-size:0.72rem;" onchange="updateTicketPrice('${t.id}', this.value, '')">
+                            <option value="CNY" ${pr.cur === 'CNY' ? 'selected' : ''}>CNY</option>
+                            <option value="JPY" ${pr.cur === 'JPY' ? 'selected' : ''}>JPY</option>
                         </select>
-                        <input id="price-amt-${t.id}" type="text" class="table-input" style="width:64px;" value="${esc(pr.amt != null ? pr.amt : '')}" placeholder="金额" onchange="updateTicketPrice('${t.id}', this.previousElementSibling.value, this.value)">
+                        <input id="price-amt-${t.id}" type="text" class="table-input" style="width:64px;" value="${esc(pr.amt != null ? pr.amt : '')}" placeholder="${pr.cur === 'JPY' ? '11000' : '500'}" onchange="updateTicketPrice('${t.id}', this.previousElementSibling.value, this.value)">
                     </span>
                 `;
 
@@ -1326,7 +1360,7 @@
         }
     }
 
-    // 更新价格（币种+金额组合）
+    // 更新价格（币种+金额组合；切币种且金额为空时自动用默认价 500/11000）
     async function updateTicketPrice(ticketId, currency, amt) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
@@ -1335,7 +1369,10 @@
         if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
         if (!assertCanManage(target)) { fetchTickets(); return; }
 
-        const price = buildPriceStr(currency || 'CNY', String(amt || '').trim());
+        const cur = currency || 'CNY';
+        const rawAmt = String(amt == null ? '' : amt).trim();
+        const amtVal = rawAmt ? rawAmt : defaultAmount(cur);
+        const price = buildPriceStr(cur, amtVal);
         const { error } = await _supabase.from('tickets').update({ price: price }).eq('id', ticketId);
         if (error) alert('价格更新失败：' + error.message);
         else {
@@ -1442,7 +1479,9 @@
         const status = document.getElementById('quick-status').value;
         const buyer = document.getElementById('quick-buyer').value.trim();
         const currency = document.getElementById('quick-currency').value;
-        const price = buildPriceStr(currency, document.getElementById('quick-price').value);
+        const priceInput = String(document.getElementById('quick-price').value).trim();
+        const qty = type === '2连番' ? 2 : 1;
+        const price = buildPriceStr(currency, priceInput ? priceInput : comboAmount(currency, qty));
 
         if (seat !== '待分配' && block !== 'UNASSIGNED') {
             const existing = getTicket(currentVenue, block, seat);
@@ -1506,10 +1545,11 @@
         selectedSeatsArray = [];
         document.getElementById('modal-title').innerText = `${currentVenue} - ${blockCode} 座位阵列`;
         const container = document.getElementById('seat-grid-container');
-        // 每次打开清空上次填写（状态/价格/买家）
+        // 每次打开重置：状态在手、币种CNY、价格默认(单张500)、买家清空
         document.getElementById('set-status').value = '在手';
         document.getElementById('set-currency').value = 'CNY';
-        document.getElementById('set-price').value = '';
+        document.getElementById('set-price').value = defaultAmount('CNY');
+        document.getElementById('set-price').removeAttribute('data-autoedited');
         document.getElementById('set-buyer').value = '';
 
         if (currentVenue === '东京场') {
@@ -1585,6 +1625,7 @@
         if (index > -1) {
             selectedSeatsArray.splice(index, 1);
             el.classList.remove('selected');
+            refreshSeatPriceAuto();
             return;
         }
 
@@ -1596,11 +1637,23 @@
             }
             selectedSeatsArray.push(seatStr);
             el.classList.add('selected');
+            refreshSeatPriceAuto();
             return;
         }
 
         selectedSeatsArray.push(seatStr);
         el.classList.add('selected');
+        refreshSeatPriceAuto();
+    }
+
+    // 自动按选中张数重算价格（若用户手动改过价格则不覆盖）
+    function refreshSeatPriceAuto() {
+        const priceEl = document.getElementById('set-price');
+        if (!priceEl) return;
+        if (priceEl.dataset.autoedited) return; // 手动改过，尊重用户
+        const cur = document.getElementById('set-currency').value;
+        const qty = Math.max(1, selectedSeatsArray.length);
+        priceEl.value = comboAmount(cur, qty);
     }
 
     async function saveSeatTicketsMulti() {
@@ -1616,7 +1669,8 @@
         const status = document.getElementById('set-status').value;
         const buyer = document.getElementById('set-buyer').value.trim();
         const currency = document.getElementById('set-currency').value;
-        const price = buildPriceStr(currency, document.getElementById('set-price').value);
+        const priceInput = String(document.getElementById('set-price').value).trim();
+        const price = buildPriceStr(currency, priceInput ? priceInput : comboAmount(currency, Math.max(1, selectedSeatsArray.length)));
 
         // 双重校验：已占座位不允许再次保存（防重复录入）
         const occupied = selectedSeatsArray.filter(s => getTicket(currentVenue, currentBlock, s));
