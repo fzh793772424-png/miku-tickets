@@ -6,79 +6,82 @@
     <title>Magical Mirai 2026 精细座位交互看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-lav: #9b8cff; --bg: #f4f9f9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(180deg, #e8f8f6 0%, var(--bg) 240px, var(--bg) 100%); margin: 0; padding: 15px; color: #333; }
+        :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-pink-soft: #ffe3ee; --miku-lav: #b39dff; --bg: #fdf6f8; --radius: 14px; }
+        body { font-family: "Yuanti SC", "YouYuan", "Comic Sans MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(180deg, #e6faf7 0%, var(--bg) 260px, var(--bg) 100%); margin: 0; padding: 15px; color: #4a4a4a; }
         .container { max-width: 1400px; margin: 0 auto; }
 
         /* ===== 初音主题横幅 ===== */
-        .miku-banner { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(57,197,187,0.25); border: 1px solid rgba(57,197,187,0.35); }
+        .miku-banner { position: relative; border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(255,143,179,0.28), 0 6px 24px rgba(57,197,187,0.22); border: 2px solid rgba(255,255,255,0.8); }
         .miku-banner img { display: block; width: 100%; height: 150px; object-fit: cover; }
-        .miku-banner .banner-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,60,55,0.55) 0%, rgba(0,0,0,0) 60%); display: flex; align-items: center; padding: 0 28px; }
-        .miku-banner .banner-title { color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.5); font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; }
-        .miku-banner .banner-title small { display: block; font-size: 0.85rem; font-weight: 400; opacity: 0.9; letter-spacing: 1px; margin-top: 4px; }
+        .miku-banner .banner-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(120,30,80,0.45) 0%, rgba(0,0,0,0) 60%); display: flex; align-items: center; padding: 0 28px; }
+        .miku-banner .banner-title { color: white; text-shadow: 0 2px 12px rgba(255,120,180,0.7), 0 2px 12px rgba(0,0,0,0.4); font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; }
+        .miku-banner .banner-title small { display: block; font-size: 0.85rem; font-weight: 400; opacity: 0.95; letter-spacing: 1px; margin-top: 4px; }
 
-        header { background: linear-gradient(120deg, #12423e 0%, #0e5a54 45%, #00897b 100%); color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--miku); box-shadow: 0 3px 14px rgba(57,197,187,0.3); }
+        header { background: linear-gradient(120deg, #b388eb 0%, #ff8fb3 45%, #39c5bb 100%); color: white; padding: 14px 20px; border-radius: var(--radius); display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid rgba(255,255,255,0.6); box-shadow: 0 4px 16px rgba(255,143,179,0.35); }
+        header h2 { font-size: 1.25rem; letter-spacing: 1px; }
 
         .tab-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
-        .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 999px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
-        .tab-btn:hover { border-color: var(--miku); box-shadow: 0 0 0 3px rgba(57,197,187,0.15); }
-        .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); box-shadow: 0 3px 12px rgba(57,197,187,0.4); }
-        .auth-tab.active { background: var(--miku); color: white; border-color: var(--miku); }
+        .tab-btn { padding: 10px 20px; background: white; border: 2px solid #ffe0ec; border-radius: 999px; font-weight: bold; cursor: pointer; transition: all 0.2s; color: #5a5a5a; }
+        .tab-btn:hover { border-color: var(--miku-pink); box-shadow: 0 0 0 4px rgba(255,143,179,0.15); transform: translateY(-1px); }
+        .tab-btn.active { background: linear-gradient(120deg,#39c5bb,#7adbc8); color: white; border-color: transparent; box-shadow: 0 4px 14px rgba(57,197,187,0.4); }
+        .auth-tab.active { background: linear-gradient(120deg,#ff8fb3,#ffb3cd); color: white; border-color: transparent; box-shadow: 0 4px 14px rgba(255,143,179,0.4); }
 
-        .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-wrap: wrap; }
-        .operator-bar input, .operator-bar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
+        .operator-bar { background: white; padding: 10px 15px; border-radius: var(--radius); margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); flex-wrap: wrap; border: 1px solid #ffe9f1; }
+        .operator-bar input, .operator-bar select { padding: 6px 10px; border: 1px solid #f0d3de; border-radius: 8px; font-weight: bold; }
         
-        .stats-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; text-align: center; }
-        .stat-box { background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
+        .stats-card { background: white; padding: 15px; border-radius: var(--radius); margin-bottom: 15px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; text-align: center; border: 1px solid #ffe9f1; }
+        .stat-box { background: linear-gradient(180deg,#fff,#fff7fa); padding: 10px; border-radius: 10px; border: 1px solid #ffe0ec; }
         .stat-num { font-size: 1.4rem; font-weight: bold; color: #333; margin-top: 4px; }
 
-        .quick-add-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-top: 3px solid var(--miku); }
+        .quick-add-card { background: white; padding: 15px; border-radius: var(--radius); margin-bottom: 15px; box-shadow: 0 2px 10px rgba(57,197,187,0.15); border-top: 4px solid var(--miku); border: 1px solid #d9f5f1; }
         .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-        .form-row input, .form-row select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+        .form-row input, .form-row select { padding: 8px 10px; border: 1px solid #e8c9d6; border-radius: 8px; font-size: 0.9rem; }
 
-        .ticket-list-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .ticket-list-card { background: white; padding: 15px; border-radius: var(--radius); margin-bottom: 15px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); border: 1px solid #ffe9f1; }
         .list-header-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
         .ticket-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 6px; text-align: center; }
-        .ticket-table th { background: #f4f6f7; font-weight: bold; }
+        .ticket-table th, .ticket-table td { border: 1px solid #fdeef3; padding: 6px; text-align: center; }
+        .ticket-table th { background: linear-gradient(180deg,#fff0f6,#ffe8f0); font-weight: bold; color:#a04070; }
 
-        .table-input { width: 90%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem; }
-        .table-input:focus { border-color: var(--miku); outline: none; background: #e0f2f1; }
-        .table-select { padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-weight: bold; }
+        .table-input { width: 90%; padding: 4px 6px; border: 1px solid #f0d3de; border-radius: 6px; text-align: center; font-size: 0.85rem; }
+        .table-input:focus { border-color: var(--miku); outline: none; background: #f0fffd; }
+        .table-select { padding: 4px 6px; border: 1px solid #f0d3de; border-radius: 6px; font-weight: bold; }
 
-        .btn-action { background: var(--miku); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .btn-action:hover { opacity: 0.9; }
-        .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-action { background: linear-gradient(120deg,#39c5bb,#5fd6c8); color: white; border: none; padding: 6px 12px; border-radius: 999px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(57,197,187,0.3); transition: all 0.2s; }
+        .btn-action:hover { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(57,197,187,0.4); }
+        .danger-btn { background: linear-gradient(120deg,#ff7ea5,#ff9fb5); color: white; border: none; padding: 8px 14px; border-radius: 999px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 8px rgba(255,126,165,0.3); }
 
         .legend { display: flex; gap: 20px; justify-content: center; margin: 10px 0; font-size: 0.85rem; font-weight: bold; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
         .dot { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
         
-        .stage { background: #555; color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: 6px; margin-bottom: 15px; letter-spacing: 2px; }
-        .map-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-x: auto; }
+        .stage { background: linear-gradient(120deg,#a17fe0,#ff8fb3); color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: var(--radius); margin-bottom: 15px; letter-spacing: 2px; box-shadow: 0 3px 12px rgba(255,143,179,0.3); }
+        .map-section { background: white; padding: 20px; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(255,143,179,0.12); overflow-x: auto; border: 1px solid #ffe9f1; }
         
         .block-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
-        .block-box { border: 1px solid #dcdcdc; background: #fdfdfd; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; position: relative; }
-        .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
+        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 10px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; position: relative; }
+        .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 4px 14px rgba(255,143,179,0.4); transform: translateY(-2px) rotate(-1deg); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
         
-        .block-badge { position: absolute; top: -8px; right: -8px; background: #222; color: white; font-size: 0.7rem; border-radius: 10px; padding: 2px 6px; font-weight: bold; border: 1px solid white; }
+        .block-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.7rem; border-radius: 10px; padding: 2px 6px; font-weight: bold; border: 1px solid white; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
         .bg-已出 { background-color: #e71d36 !important; color: white; border-color: #b80c21; }
         
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 95%; max-width: 900px; max-height: 90vh; overflow-y: auto; position: relative; }
-        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; font-weight: bold; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(255,150,190,0.35); justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content { background: #fffdfe; padding: 20px; border-radius: var(--radius); width: 95%; max-width: 900px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 12px 40px rgba(255,120,170,0.3); border: 2px solid #ffe9f1; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; font-weight: bold; color: #ff8fb3; }
 
-        .seat-grid { display: grid; gap: 4px; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; overflow-x: auto; }
-        .seat-node { width: 28px; height: 28px; border: 1px solid #ccc; background: white; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
-        .seat-node:hover { border-color: var(--miku); background: #e0f2f1; }
-        .seat-node.selected { background: var(--miku) !important; color: white !important; font-weight: bold; border-color: #00796b !important; }
+        .seat-grid { display: grid; gap: 4px; margin-top: 15px; padding: 10px; background: #fff7fa; border-radius: 10px; border: 1px solid #ffe0ec; overflow-x: auto; }
+        .seat-node { width: 28px; height: 28px; border: 1px solid #f0c9d8; background: white; border-radius: 5px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.12s; }
+        .seat-node:hover { border-color: var(--miku-pink); background: #fff0f6; transform: scale(1.15); }
+        .seat-node.selected { background: linear-gradient(135deg,#39c5bb,#8fe8db) !important; color: white !important; font-weight: bold; border-color: #fff !important; }
+        .seat-node.transferred { position: relative; border-color: #ff8fb3 !important; box-shadow: 0 0 0 1px #ffb3cd inset; }
+        .seat-node.transferred::after { content: "♡"; position: absolute; top: -7px; right: -4px; font-size: 0.65rem; color: #ff5c9c; background: white; border-radius: 50%; width: 13px; height: 13px; line-height: 13px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
-        .log-box { background: white; padding: 15px; border-radius: 8px; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fafafa; padding: 8px; border: 1px solid #eee; }
+        .log-box { background: white; padding: 15px; border-radius: var(--radius); margin-top: 15px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); border: 1px solid #ffe9f1; }
+        .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fffafc; padding: 8px; border: 1px solid #ffe9f1; border-radius: 8px; }
 
         .ticket-no-badge { background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
 
@@ -724,6 +727,15 @@
         return '';
     }
 
+    // 转来的票标记：note 里有"原属:xxx"表示这张票是别人转来的
+    function originalOwnerOf(t) {
+        if (t && t.note && t.note.includes('原属:')) {
+            const m = t.note.match(/原属:([^\]]+)/);
+            if (m) return m[1].trim();
+        }
+        return '';
+    }
+
     // 数据每次刷新后重建：按"场馆+操作人"给每张票编友好号（大瓜-1、星黎-2…）
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
@@ -961,12 +973,16 @@
         const fromName = operatorOf(t) || '';
         if (fromName === toName) { alert('这张票本来就是这个人的，无需转让'); return; }
 
-        // 改 note 里的 BY:xxx
+        // 改 note 里的 BY:xxx，并记录"原归属"标记（转来的票一眼可辨）
         let updatedNote = t.note || '';
         if (updatedNote.includes('BY:')) {
             updatedNote = updatedNote.replace(/BY:[^\]]+/, `BY:${toName}`);
         } else {
             updatedNote += `[BY:${toName}]`;
+        }
+        // 若还没记录过原归属，则记下（转票标记 ⭐）
+        if (!updatedNote.includes('原属:')) {
+            updatedNote = updatedNote.replace(/\[BY:[^\]]*\]/, `[原属:${fromName || '未知'}][BY:${toName}]`);
         }
 
         const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', t.id);
@@ -1099,6 +1115,8 @@
                 else if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
 
                 const ticketNo = ticketNoMapById[t.id] || '票-';
+                const origOwner = originalOwnerOf(t);
+                const transferBadge = origOwner ? `<span style="margin-left:4px; background:#fff0f5; color:#d63384; border:1px solid #ffc2d9; font-size:0.7rem; border-radius:10px; padding:1px 6px; cursor:default;" title="这张票是 ${esc(origOwner)} 转来的">↔️ 转自${esc(origOwner)}</span>` : '';
 
                 const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
                     .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
@@ -1116,7 +1134,7 @@
 
                 return `
                     <tr>
-                        <td><span class="ticket-no-badge">${esc(ticketNo)}</span></td>
+                        <td><span class="ticket-no-badge">${esc(ticketNo)}</span>${transferBadge}</td>
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
@@ -1303,7 +1321,7 @@
                 for(let i=1; i<=conf.seats; i++) {
                     const seatStr = `${i}番`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${i}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${i}</div>`;
                 }
                 container.innerHTML = html;
             } else {
@@ -1314,7 +1332,7 @@
                     for(let seat = 1; seat <= conf.seats; seat++) {
                         const seatStr = `${col}列${seat}番`;
                         const ticket = getTicket(currentVenue, blockCode, seatStr);
-                        html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
+                        html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
                     }
                 }
                 container.innerHTML = html;
@@ -1329,7 +1347,7 @@
                 for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
                     const seatStr = `${col}排${seat}座`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
                 }
             }
             container.innerHTML = html;
@@ -1347,7 +1365,7 @@
                 for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
                     const seatStr = `${label}${seat}番`;
                     const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}" onclick="toggleSeatSelect('${seatStr}', this)">${seat}</div>`;
+                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
                 }
             }
             container.innerHTML = html;
