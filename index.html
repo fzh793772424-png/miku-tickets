@@ -17,7 +17,7 @@
         .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); }
 
         .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-wrap: wrap; }
-        .operator-bar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #00796b; }
+        .operator-bar input, .operator-bar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         
         .stats-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; text-align: center; }
         .stat-box { background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
@@ -33,9 +33,10 @@
         .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 6px; text-align: center; }
         .ticket-table th { background: #f4f6f7; font-weight: bold; }
 
-        /* 表格内直接输入的样式 */
+        /* 表格内输入框与下拉样式 */
         .table-input { width: 90%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem; }
         .table-input:focus { border-color: var(--miku); outline: none; background: #e0f2f1; }
+        .table-select { padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-weight: bold; }
 
         .btn-action { background: var(--miku); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-action:hover { opacity: 0.9; }
@@ -80,7 +81,7 @@
 <div class="container">
     <header>
         <h2>⚡ Magical Mirai 2026 精细座位交互看板</h2>
-        <span id="sync-status" style="font-size: 0.85rem; color:#39C5BB;">🟢 Supabase 已连接</span>
+        <span id="sync-status" style="font-size: 0.85rem; color:#39C5BB;">🟢 Supabase 已实时连接</span>
     </header>
 
     <div class="tab-bar">
@@ -89,10 +90,20 @@
         <button class="tab-btn" id="btn-hiroshima" onclick="switchVenue('广岛场')">广岛场 (上野学园大厅)</button>
     </div>
 
+    <!-- 🔑 操作人与独立密码验证 -->
     <div class="operator-bar">
-        <div>
-            <span>👤 操作人署名：</span>
-            <input type="text" id="operator-name" placeholder="请输入你的名字" onchange="saveOperatorName()">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <span>👤 操作人：</span>
+            <select id="operator-select" onchange="saveOperatorSession()">
+                <option value="">-- 请选择身份 --</option>
+                <option value="大瓜">大瓜</option>
+                <option value="星黎">星黎</option>
+                <option value="薯饼">薯饼</option>
+                <option value="村民">村民</option>
+                <option value="X">X</option>
+            </select>
+            <span>🔑 密码：</span>
+            <input type="password" id="operator-pass" placeholder="输入密码" style="width:100px;" onchange="saveOperatorSession()">
         </div>
         <div>
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
@@ -111,9 +122,9 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- 🎫 录入/打点表单 -->
+    <!-- 🎫 录入表单 -->
     <div class="quick-add-card">
-        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入与快捷打点：</strong>
+        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入（也可直接点击下方地图进行打点录入）：</strong>
         <div class="form-row">
             <select id="quick-block" onchange="updateSeatDropdown()" style="font-weight:bold; color:#00796b;">
                 <option value="UNASSIGNED">❓ 待分配 / 未出票 (无具体Block)</option>
@@ -159,7 +170,7 @@
             <thead>
                 <tr>
                     <th>票据编号</th>
-                    <th>区域 (Block)</th>
+                    <th>区域 (Block 直接修改)</th>
                     <th>票源 / 类型</th>
                     <th>座位号 (直接修改)</th>
                     <th>状态</th>
@@ -186,7 +197,7 @@
     </div>
 
     <div class="log-box">
-        <h3>📖 操作日志</h3>
+        <h3>📖 实时操作日志 (全员同步)</h3>
         <div id="log-list" class="log-list"></div>
     </div>
 </div>
@@ -219,6 +230,15 @@
     const SUPABASE_URL = 'https://matckyhwzjwmdazpqzgx.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 🔒 预设密码表
+    const USER_PASSWORDS = {
+        '大瓜': '3939',
+        '星黎': '1234',
+        '薯饼': '4321',
+        '村民': '3939',
+        'X': '6666'
+    };
 
     let currentVenue = '东京场';
     let allTickets = [];
@@ -267,11 +287,13 @@
     };
 
     function init() {
-        document.getElementById('operator-name').value = localStorage.getItem('miku_operator_name') || '';
+        document.getElementById('operator-select').value = localStorage.getItem('miku_op_user') || '';
+        document.getElementById('operator-pass').value = localStorage.getItem('miku_op_pass') || '';
         renderCurrentVenue();
         fetchTickets();
         fetchLogs();
 
+        // 📡 Realtime 监听 - 全员实时同步数据与日志
         _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets()).subscribe();
         _supabase.channel('logs').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs()).subscribe();
     }
@@ -287,14 +309,27 @@
         updateStatsAndHighlights();
     }
 
-    function saveOperatorName() {
-        localStorage.setItem('miku_operator_name', document.getElementById('operator-name').value.trim());
+    function saveOperatorSession() {
+        localStorage.setItem('miku_op_user', document.getElementById('operator-select').value);
+        localStorage.setItem('miku_op_pass', document.getElementById('operator-pass').value);
     }
 
-    function getOperatorName() {
-        const name = document.getElementById('operator-name').value.trim();
-        if (!name) { alert('请先填写顶部的【操作人署名】！'); return null; }
-        return name;
+    function getAuthenticatedOperator() {
+        const user = document.getElementById('operator-select').value;
+        const pass = document.getElementById('operator-pass').value.trim();
+
+        if (!user) { alert('⚠️ 请先选择操作人！'); return null; }
+        if (USER_PASSWORDS[user] !== pass) {
+            alert(`❌ 密码错误！用户【${user}】的密码不匹配。`);
+            return null;
+        }
+        return user;
+    }
+
+    function getBlockKeys() {
+        if (currentVenue === '东京场') return Object.keys(TOKYO_CONFIG);
+        if (currentVenue === '广岛场') return Object.keys(HIROSHIMA_CONFIG);
+        return Object.keys(OSAKA_CONFIG);
     }
 
     function renderCurrentVenue() {
@@ -341,11 +376,7 @@
 
     function populateBlockDropdown() {
         const select = document.getElementById('quick-block');
-        let keys = [];
-        if (currentVenue === '东京场') keys = Object.keys(TOKYO_CONFIG);
-        else if (currentVenue === '广岛场') keys = Object.keys(HIROSHIMA_CONFIG);
-        else keys = Object.keys(OSAKA_CONFIG);
-
+        let keys = getBlockKeys();
         select.innerHTML = '<option value="UNASSIGNED">❓ 待分配 / 未出票 (无具体Block)</option>' + keys.map(k => `<option value="${k}">${k} Block</option>`).join('');
         updateSeatDropdown();
     }
@@ -393,7 +424,6 @@
         seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : s}">${s}</option>`).join('');
     }
 
-    // 💡 重点：按 created_at 正序拉取，防止修改状态后顺序颠倒
     async function fetchTickets() {
         const { data } = await _supabase
             .from('tickets')
@@ -456,13 +486,11 @@
         });
     }
 
-    // 📋 条件筛选与表格渲染（包含编号生成、直接输入框修改）
     function renderTicketTable() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
         const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
 
-        // 自动计算每人/全局的编号（大瓜-1, 大瓜-2）
         const userTicketCounters = {};
         const ticketNoMap = {};
 
@@ -495,23 +523,31 @@
         });
 
         const tbody = document.getElementById('ticket-list-body');
+        const blockKeys = getBlockKeys();
+
         if (filtered.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">无符合条件数据</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map(t => {
-                let blockCode = '待分配';
+                let blockCode = 'UNASSIGNED';
                 if (t.note && t.note.includes('BLOCK:')) {
                     const match = t.note.match(/BLOCK:([^\]]+)/);
-                    if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
+                    if (match) blockCode = match[1];
                 }
+
                 const source = (t.note && t.note.includes('海外票')) ? '🌏 海外' : '🇯🇵 本土';
                 const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="color:#00796b; font-weight:bold;">👭 2连</span>` : `👤 单人`;
-                const blockDisplay = blockCode !== '待分配' ? `<strong>${blockCode}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 待定</span>`;
                 const ticketNo = ticketNoMap[t.id] || '票-';
 
-                // 快捷修改状态
+                // 块（Block）可直接下拉选择修改
+                const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
+                    .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
+                    .join('');
+
+                const blockSelectHtml = `<select class="table-select" onchange="updateTicketBlock('${t.id}', this.value, '${t.note || ''}')">${blockSelectOptions}</select>`;
+
                 const statusSelectHtml = `
-                    <select onchange="updateTicketField('${t.id}', 'status', this.value)" style="padding: 2px 4px; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; background: white; cursor: pointer;">
+                    <select class="table-select" onchange="updateTicketField('${t.id}', 'status', this.value)">
                         <option value="在手" ${t.status === '在手' ? 'selected' : ''}>🟢 在手</option>
                         <option value="预定" ${t.status === '预定' ? 'selected' : ''}>🟠 预定</option>
                         <option value="已出" ${t.status === '已出' ? 'selected' : ''}>🔴 已出</option>
@@ -521,7 +557,7 @@
                 return `
                     <tr>
                         <td><span class="ticket-no-badge">${ticketNo}</span></td>
-                        <td>${blockDisplay}</td>
+                        <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
                             <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待出票/分配" onchange="updateTicketField('${t.id}', 'seat', this.value)">
@@ -542,29 +578,43 @@
         }
     }
 
-    // 💡 通用更新字段函数（修改座位、状态、买家、价格直接保存）
-    async function updateTicketField(ticketId, field, value) {
-        const operator = getOperatorName();
-        if (!operator) {
-            fetchTickets();
-            return;
+    // 修改 Block 关联
+    async function updateTicketBlock(ticketId, newBlock, oldNote) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) { fetchTickets(); return; }
+
+        let updatedNote = oldNote;
+        if (updatedNote.includes('BLOCK:')) {
+            updatedNote = updatedNote.replace(/BLOCK:[^\]]+/, `BLOCK:${newBlock}`);
+        } else {
+            updatedNote = `[BLOCK:${newBlock}]` + updatedNote;
         }
+
+        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', ticketId);
+        if (error) alert('修改Block失败：' + error.message);
+        else {
+            await addLog('修改区块', `将票据 [${ticketId}] 的区域调整为: ${newBlock}`);
+            fetchTickets();
+        }
+    }
+
+    async function updateTicketField(ticketId, field, value) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) { fetchTickets(); return; }
 
         const updateData = {};
         updateData[field] = value.trim();
 
         const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
-
-        if (error) {
-            alert('更新失败：' + error.message);
-        } else {
-            await addLog('修改信息', `修改票据 [ID: ${ticketId}] 的 ${field} 为: ${value}`);
+        if (error) alert('更新失败：' + error.message);
+        else {
+            await addLog('修改信息', `修改票据 [${ticketId}] 的 ${field} 为: ${value}`);
             fetchTickets();
         }
     }
 
     async function addQuickTicket() {
-        const operator = getOperatorName();
+        const operator = getAuthenticatedOperator();
         if (!operator) return;
 
         const block = document.getElementById('quick-block').value;
@@ -601,7 +651,7 @@
     }
 
     async function deleteSingleTicket(ticketId) {
-        const operator = getOperatorName();
+        const operator = getAuthenticatedOperator();
         if (!operator) return;
 
         if (confirm('确定要删除这组票据记录吗？')) {
@@ -699,7 +749,7 @@
     }
 
     async function saveSeatTicketsMulti() {
-        const operator = getOperatorName();
+        const operator = getAuthenticatedOperator();
         if (!operator) return;
         if (selectedSeatsArray.length === 0) { alert('请先点击选中至少一个座位！'); return; }
 
@@ -725,7 +775,7 @@
     }
 
     async function deleteSeatTicketsMulti() {
-        const operator = getOperatorName();
+        const operator = getAuthenticatedOperator();
         if (!operator) return;
         if (selectedSeatsArray.length === 0) { alert('请先选中要清除的座位！'); return; }
 
@@ -787,19 +837,13 @@
     }
 
     async function clearCurrentVenueTickets() {
-        const operator = getOperatorName();
+        const operator = getAuthenticatedOperator();
         if (!operator) return;
-
-        const pwd = prompt(`⚠️ 危险操作！请输入密码清空【${currentVenue}】的所有票据数据：`);
-        if (pwd !== '3939') {
-            if (pwd !== null) alert('❌ 密码错误，清空操作已被拒绝！');
-            return;
-        }
 
         if (confirm(`‼️ 确认清空：即将彻底从数据库中删除【${currentVenue}】的所有票据记录，确定吗？`)) {
             const { error } = await _supabase.from('tickets').delete().eq('show', currentVenue);
             if (!error) {
-                await addLog('彻底清空', `密码验证成功，清空了【${currentVenue}】的全量票据`);
+                await addLog('彻底清空', `清空了【${currentVenue}】的全量票据`);
                 alert(`✅ 【${currentVenue}】的所有票据已清空！`);
                 fetchTickets();
             } else {
@@ -809,7 +853,7 @@
     }
 
     async function addLog(action, detail) {
-        const operator = document.getElementById('operator-name').value.trim() || '未知用户';
+        const operator = document.getElementById('operator-select').value || '未知用户';
         await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
     }
 
