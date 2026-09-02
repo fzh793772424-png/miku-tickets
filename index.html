@@ -894,16 +894,17 @@
     }
 
     // 数据每次刷新后重建 id → 票号 映射：
-    // 优先用数据库固定的 ticket_no（录入时=原主名字，转票后也不变）
-    // 若某票实在没有 ticket_no（老数据没回填），显示 票#{数据库id}，永不受归属变化影响
+    // 编号跟随【当前主人】(BY)动态排：同场馆内每人从 1 开始（星黎-1、星黎-2…）
+    // 转票后 BY 变了 → 这张票自然排进新主人的编号里
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
+        const counter = {};
+        // 遍历顺序稳定（fetch 已按 created_at 升序）
         allTickets.forEach(t => {
-            if (t.ticket_no) {
-                ticketNoMapById[t.id] = t.ticket_no;
-            } else {
-                ticketNoMapById[t.id] = '票#' + t.id;
-            }
+            const owner = operatorOf(t) || '未署名';
+            const key = (t.show || '?') + '|' + owner;
+            counter[key] = (counter[key] || 0) + 1;
+            ticketNoMapById[t.id] = `${owner}-${counter[key]}`;
         });
     }
 
@@ -1667,9 +1668,6 @@
             }
         }
 
-        // 分配固定票号（如 大瓜-7，永不变）
-        const fixedNo = await nextTicketNo(operator);
-
         // 插入后取回新票 id（用于历史档案关联）；uniq_key 由云端唯一约束兜底防重复
         const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
@@ -1677,7 +1675,6 @@
             status: status,
             buyer: buyer,
             price: price,
-            ticket_no: fixedNo,
             uniq_key: seatDedupKey(currentVenue, block, seat),
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]).select('id');
