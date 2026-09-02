@@ -6,19 +6,28 @@
     <title>Magical Mirai 2026 精细座位交互看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-pink-soft: #ffe3ee; --miku-lav: #b39dff; --bg: #fdf6f8; --radius: 14px; }
-        body { font-family: "Yuanti SC", "YouYuan", "Comic Sans MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: linear-gradient(180deg, #e6faf7 0%, var(--bg) 260px, var(--bg) 100%); margin: 0; padding: 15px; color: #4a4a4a; }
-        .container { max-width: 1400px; margin: 0 auto; }
+        :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-pink-soft: #ffe3ee; --miku-lav: #b39dff; --bg: #fafafa; --radius: 14px; }
+        /* 主体：左侧海报柱 + 右侧内容（宽屏才显示海报，避免手机挤压） */
+        body { font-family: "Yuanti SC", "YouYuan", "Comic Sans MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f6f6f9; margin: 0; padding: 12px; color: #3c3c3c; }
+        .shell { max-width: 1500px; margin: 0 auto; display: flex; gap: 16px; align-items: flex-start; }
+        .poster-col { width: 230px; flex-shrink: 0; position: sticky; top: 12px; }
+        .poster-card { border-radius: var(--radius); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 3px solid white; background: #fff; }
+        .poster-card img { display: block; width: 100%; height: auto; object-fit: cover; }
+        .poster-caption { padding: 8px 10px; font-size: 0.78rem; color: #888; text-align: center; background: linear-gradient(180deg,#fff,#fff4f8); }
+        .container { flex: 1; min-width: 0; }
+        /* 窄屏：隐藏海报栏，回归单列 */
+        @media (max-width: 1000px) { .poster-col { display: none; } .shell { display: block; } }
 
-        /* ===== 初音主题横幅 ===== */
-        .miku-banner { position: relative; border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(255,143,179,0.28), 0 6px 24px rgba(57,197,187,0.22); border: 2px solid rgba(255,255,255,0.8); }
-        .miku-banner img { display: block; width: 100%; height: 150px; object-fit: cover; }
-        .miku-banner .banner-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(120,30,80,0.45) 0%, rgba(0,0,0,0) 60%); display: flex; align-items: center; padding: 0 28px; }
-        .miku-banner .banner-title { color: white; text-shadow: 0 2px 12px rgba(255,120,180,0.7), 0 2px 12px rgba(0,0,0,0.4); font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; }
-        .miku-banner .banner-title small { display: block; font-size: 0.85rem; font-weight: 400; opacity: 0.95; letter-spacing: 1px; margin-top: 4px; }
+        /* ===== 顶部横幅 ===== */
+        .miku-banner { position: relative; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); border: 2px solid white; }
+        .miku-banner img { display: block; width: 100%; height: 170px; object-fit: cover; }
+        .miku-banner .banner-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(20,20,30,0.35) 0%, rgba(20,20,30,0.05) 70%); display: flex; align-items: flex-end; padding: 0 22px 14px; }
+        .miku-banner .banner-title { color: white; text-shadow: 0 1px 8px rgba(0,0,0,0.55); font-size: 1.5rem; font-weight: 800; letter-spacing: 1px; }
+        .miku-banner .banner-title small { display: block; font-size: 0.8rem; font-weight: 500; opacity: 0.92; letter-spacing: 1px; margin-top: 2px; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
 
-        header { background: linear-gradient(120deg, #b388eb 0%, #ff8fb3 45%, #39c5bb 100%); color: white; padding: 14px 20px; border-radius: var(--radius); display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid rgba(255,255,255,0.6); box-shadow: 0 4px 16px rgba(255,143,179,0.35); }
-        header h2 { font-size: 1.25rem; letter-spacing: 1px; }
+        header { background: rgba(255,255,255,0.92); color: #333; padding: 10px 16px; border-radius: var(--radius); display: flex; justify-content: space-between; align-items: center; gap: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); border: 1px solid #eee; backdrop-filter: blur(6px); flex-wrap: wrap; }
+        header h2 { font-size: 1.1rem; letter-spacing: 0.5px; color: #005b55; margin: 0; }
+        header .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
         .tab-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; background: white; border: 2px solid #ffe0ec; border-radius: 999px; font-weight: bold; cursor: pointer; transition: all 0.2s; color: #5a5a5a; }
@@ -111,6 +120,15 @@
 </head>
 <body>
 
+<div class="shell">
+    <!-- 左侧海报柱（1.JPG 竖版图） -->
+    <div class="poster-col">
+        <div class="poster-card">
+            <img src="1.JPG" alt="初音ミク">
+            <div class="poster-caption">✧ 初音ミク Magical Mirai 2026 ✧</div>
+        </div>
+    </div>
+
 <div class="container">
     <!-- 初音横幅 -->
     <div class="miku-banner">
@@ -122,9 +140,9 @@
 
     <header>
         <h2>⚡ Magical Mirai 2026 精细座位交互看板</h2>
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div class="header-right">
             <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接…</span>
-            <span id="user-chip" style="font-size:0.9rem; font-weight:bold; color:#39C5BB; background:rgba(255,255,255,0.1); padding:4px 12px; border-radius:20px;">未登录</span>
+            <span id="user-chip" style="font-size:0.85rem; font-weight:bold; color:#00897b; background:#e6f7f5; padding:4px 12px; border-radius:20px; border:1px solid #c9eeea;">未登录</span>
             <button class="btn-action" id="btn-logout" style="background:#5c6bc0; display:none;" onclick="authLogout()">🚪 退出登录</button>
         </div>
     </header>
@@ -133,7 +151,7 @@
     <div id="auth-overlay" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(20,25,30,0.86); justify-content:center; align-items:flex-start; padding:30px 15px; overflow-y:auto;">
         <div style="background:white; max-width:430px; width:100%; border-radius:12px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4); border-top: 6px solid var(--miku);">
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
-                <img src="1.JPG" alt="miku" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:3px solid var(--miku); box-shadow:0 3px 10px rgba(57,197,187,0.5);">
+                <img src="2.JPG" alt="miku" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:3px solid var(--miku); box-shadow:0 3px 10px rgba(57,197,187,0.5);">
                 <div>
                     <h2 style="margin:0; color:#00796b;">🎵 Miku 20th 座位看板</h2>
                     <p style="margin:2px 0 0; color:#999; font-size:0.8rem;">✧ みんなで協力して 39 (サンキュー) ✧</p>
@@ -304,6 +322,8 @@
         <div id="log-list" class="log-list"></div>
     </div>
 </div>
+
+</div><!-- /shell -->
 
 <!-- 成员票池明细 Modal -->
 <div id="memberModal" class="modal" onclick="closeMemberModal()">
@@ -736,6 +756,23 @@
         return '';
     }
 
+    // 权限规则：谁能管理这张票？
+    // - 管理员(isAdmin) 可以动任何票（配合"彻底清空"）
+    // - 普通成员只能动【自己名下】的票
+    // - 没署名/未知归属的旧票：允许任何已登录成员修正（否则无人能改）
+    function canManageTicket(t) {
+        if (isAdmin) return true;
+        const owner = operatorOf(t) || '';
+        if (!owner || owner === '未知' || owner === '未署名') return true;
+        return owner === operatorName;
+    }
+
+    function assertCanManage(t) {
+        if (canManageTicket(t)) return true;
+        alert(`⛔ 这张票是「${operatorOf(t) || '别人'}」名下的，你只能管理自己名下的票。\n（需要处理别人的票？请联系管理员）`);
+        return false;
+    }
+
     // 数据每次刷新后重建：按"场馆+操作人"给每张票编友好号（大瓜-1、星黎-2…）
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
@@ -943,6 +980,7 @@
 
         const t = findTicketById(ticketId);
         if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(t)) return;
 
         const fromName = operatorOf(t) || '未署名';
         transferTicketId = t.id;
@@ -970,6 +1008,7 @@
 
         const t = findTicketById(transferTicketId);
         if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(t)) return;
         const fromName = operatorOf(t) || '';
         if (fromName === toName) { alert('这张票本来就是这个人的，无需转让'); return; }
 
@@ -991,6 +1030,33 @@
         await addLog('转票', `将 ${ticketDesc(t)} 转给 ${toName}`, t.id);
         alert(`✅ 已把票转给 ${toName}！`);
         closeTransferModal();
+        fetchTickets();
+    }
+
+    // ⬅️ 退回：把转来的票退回给原归属人
+    async function returnTicket(ticketId) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        const t = findTicketById(ticketId);
+        if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(t)) return;
+
+        const orig = originalOwnerOf(t);
+        if (!orig) { alert('这张票不是转来的，没有可退回的原主。'); return; }
+        const curOwner = operatorOf(t) || '';
+        if (orig === curOwner) { alert('这张票已经归还原主了。'); return; }
+
+        // 把 BY 改回原主，并移除"原属"标记（已回到原主手里）
+        let updatedNote = t.note || '';
+        updatedNote = updatedNote.replace(/BY:[^\]]+/, `BY:${orig}`);
+        updatedNote = updatedNote.replace(/\[原属:[^\]]*\]/, '');
+
+        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', t.id);
+        if (error) { alert('退回失败：' + error.message); return; }
+
+        await addLog('退回票据', `将 ${ticketDesc(t)} 退回给原主 ${orig}`, t.id);
+        alert(`⬅️ 已把票退回给 ${orig}！`);
         fetchTickets();
     }
 
@@ -1116,7 +1182,22 @@
 
                 const ticketNo = ticketNoMapById[t.id] || '票-';
                 const origOwner = originalOwnerOf(t);
+                const ownerName = operatorOf(t) || '未署名';
                 const transferBadge = origOwner ? `<span style="margin-left:4px; background:#fff0f5; color:#d63384; border:1px solid #ffc2d9; font-size:0.7rem; border-radius:10px; padding:1px 6px; cursor:default;" title="这张票是 ${esc(origOwner)} 转来的">↔️ 转自${esc(origOwner)}</span>` : '';
+
+                // 操作按钮按权限显示：非本人且非管理员名下的票，不显示可改按钮
+                const canM = canManageTicket(t);
+                const actionBtns = [];
+                if (canM) {
+                    actionBtns.push(`<button onclick="openTransferModal('${t.id}')" style="font-size:0.75rem; background:#00897b; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;">↔️ 转</button>`);
+                    if (origOwner && origOwner !== ownerName) {
+                        actionBtns.push(`<button onclick="returnTicket('${t.id}')" style="font-size:0.75rem; background:#b388eb; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="退回给原主 ${esc(origOwner)}">⬅️ 退回</button>`);
+                    }
+                    actionBtns.push(`<button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>`);
+                } else {
+                    actionBtns.push(`<span style="font-size:0.72rem; color:#bbb;" title="只能管理自己名下的票">🔒 ${esc(ownerName)}的票</span>`);
+                }
+                const actionHtml = actionBtns.join(' ');
 
                 const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
                     .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
@@ -1148,8 +1229,7 @@
                             <input type="text" class="table-input" value="${esc(t.price)}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
                         </td>
                         <td style="white-space:nowrap;">
-                            <button onclick="openTransferModal('${t.id}')" style="font-size:0.75rem; background:#00897b; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">↔️ 转</button>
-                            <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
+                            ${actionHtml}
                         </td>
                         <td>
                             <button onclick="openTicketHistory('${t.id}')" style="font-size:0.75rem; background:#5c6bc0; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📜 历史</button>
@@ -1167,6 +1247,7 @@
         // 从本地已加载的数据中取当前记录，避免把用户输入拼进 HTML 属性
         const target = findTicketById(ticketId);
         if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(target)) { fetchTickets(); return; }
         const oldNote = target.note || '';
 
         let updatedNote = oldNote;
@@ -1205,6 +1286,7 @@
 
         const target = findTicketById(ticketId);
         if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(target)) { fetchTickets(); return; }
         const oldNote = target.note || '';
 
         let updatedNote = oldNote;
@@ -1227,15 +1309,19 @@
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
 
+        const target = findTicketById(ticketId);
+        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(target)) { fetchTickets(); return; }
+
         const updateData = {};
         updateData[field] = String(value).trim();
 
         const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
-            const target = findTicketById(ticketId);
+            const t2 = findTicketById(ticketId);
             const fieldLabel = field === 'status' ? '状态' : field === 'buyer' ? '买家' : field === 'price' ? '价格' : field;
-            await addLog('修改信息', `将 ${ticketDesc(target)} 的${fieldLabel}改为: ${value}`, ticketId);
+            await addLog('修改信息', `将 ${ticketDesc(t2 || target)} 的${fieldLabel}改为: ${value}`, ticketId);
             fetchTickets();
         }
     }
@@ -1285,7 +1371,9 @@
         if (!operator) return;
 
         const targetTicket = findTicketById(ticketId);
-        
+        if (!targetTicket) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(targetTicket)) return;
+
         let blockInfo = '待分配Block';
         if (targetTicket && targetTicket.note && targetTicket.note.includes('BLOCK:')) {
             const match = targetTicket.note.match(/BLOCK:([^\]]+)/);
@@ -1452,22 +1540,26 @@
         if (!operator) return;
         if (selectedSeatsArray.length === 0) { alert('请先选中要清除的座位！'); return; }
 
-        // 找出当前选中的座位里真正有记录的，逐个删除
-        const toDelete = selectedSeatsArray.filter(s => !!getTicket(currentVenue, currentBlock, s));
-        if (toDelete.length === 0) {
+        // 找出当前选中的座位里真正有记录的，逐个删除（只能清自己名下/管理员可清全部）
+        const selectedWithTicket = selectedSeatsArray.map(s => ({ seat: s, t: getTicket(currentVenue, currentBlock, s) })).filter(x => !!x.t);
+        if (selectedWithTicket.length === 0) {
             alert('选中的座位没有已录入的记录，无需清除。');
             return;
         }
 
-        if (!confirm(`确定要清除以下 ${toDelete.length} 个座位的记录吗？\n${toDelete.join('\n')}`)) return;
+        const allowed = selectedWithTicket.filter(x => canManageTicket(x.t));
+        const blocked = selectedWithTicket.filter(x => !canManageTicket(x.t));
+        if (blocked.length > 0) {
+            alert(`⛔ 以下座位是别人名下的票，不能清除（请管理员处理）：\n${blocked.map(b => b.seat).join('、')}`);
+            if (allowed.length === 0) { fetchTickets(); openSeatModal(currentBlock); return; }
+        }
 
-        for (let seatStr of toDelete) {
-            const existing = getTicket(currentVenue, currentBlock, seatStr);
-            if (existing) {
-                const { error } = await _supabase.from('tickets').delete().eq('id', existing.id);
-                if (error) { alert('清除失败：' + error.message); return; }
-                await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】座位: ${seatStr}`, existing.id);
-            }
+        if (!confirm(`确定要清除以下 ${allowed.length} 个座位的记录吗？\n${allowed.map(a => a.seat).join('\n')}`)) { fetchTickets(); openSeatModal(currentBlock); return; }
+
+        for (let { seat, t } of allowed) {
+            const { error } = await _supabase.from('tickets').delete().eq('id', t.id);
+            if (error) { alert('清除失败：' + error.message); return; }
+            await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】座位: ${seat}`, t.id);
         }
         fetchTickets();
         openSeatModal(currentBlock);
