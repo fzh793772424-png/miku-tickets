@@ -650,6 +650,12 @@
         });
     }
 
+    // 按 id 找票（兼容数字/字符串：数据库 id 是 bigint，页面传入的是字符串）
+    function findTicketById(id) {
+        const sid = String(id);
+        return allTickets.find(t => String(t.id) === sid);
+    }
+
     // 日志里描述一张票：大瓜-1｜东京场 A5区 10列8番
     function ticketDesc(t) {
         if (!t) return '未知票';
@@ -849,7 +855,7 @@
         if (!operator) { fetchTickets(); return; }
 
         // 从本地已加载的数据中取当前记录，避免把用户输入拼进 HTML 属性
-        const target = allTickets.find(t => t.id === ticketId);
+        const target = findTicketById(ticketId);
         if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
         const oldNote = target.note || '';
 
@@ -877,7 +883,7 @@
         const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote }).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
-            const t2 = allTickets.find(x => x.id === ticketId);
+            const t2 = findTicketById(ticketId);
             await addLog('修改座位', `修改 ${ticketDesc(t2 || target)} → 座位改为: ${newSeatValue}`);
             fetchTickets();
         }
@@ -887,7 +893,7 @@
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
 
-        const target = allTickets.find(t => t.id === ticketId);
+        const target = findTicketById(ticketId);
         if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
         const oldNote = target.note || '';
 
@@ -901,7 +907,7 @@
         const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', ticketId);
         if (error) alert('修改Block失败：' + error.message);
         else {
-            const t2 = allTickets.find(x => x.id === ticketId);
+            const t2 = findTicketById(ticketId);
             await addLog('修改区域', `将 ${ticketDesc(t2 || target)} 的区域调整为: ${newBlock}`);
             fetchTickets();
         }
@@ -917,7 +923,7 @@
         const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
-            const target = allTickets.find(t => t.id === ticketId);
+            const target = findTicketById(ticketId);
             const fieldLabel = field === 'status' ? '状态' : field === 'buyer' ? '买家' : field === 'price' ? '价格' : field;
             await addLog('修改信息', `将 ${ticketDesc(target)} 的${fieldLabel}改为: ${value}`);
             fetchTickets();
@@ -966,7 +972,7 @@
         const operator = getAuthenticatedOperator();
         if (!operator) return;
 
-        const targetTicket = allTickets.find(t => t.id === ticketId);
+        const targetTicket = findTicketById(ticketId);
         
         let blockInfo = '待分配Block';
         if (targetTicket && targetTicket.note && targetTicket.note.includes('BLOCK:')) {
