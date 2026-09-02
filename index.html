@@ -915,9 +915,17 @@
     }
 
     // ===== 分配下一个固定票号 =====
-    // 规则：操作人名下已有的最大序号 + 1，如 大瓜-7；永不重用（删掉的号也不再用）
+    // 调用云端账本函数 alloc_ticket_no：账本只涨不退 → 删票后号码也绝不重用
     async function nextTicketNo(op) {
         const prefix = op || '票';
+        try {
+            const { data, error } = await _supabase.rpc('alloc_ticket_no', { p_owner: prefix });
+            if (error) throw error;
+            if (data) return data;   // 返回如 大瓜-11
+        } catch (e) {
+            console.error('取号失败，退回本地计算：', e);
+        }
+        // 兜底：云端函数不可用时的临时方案（尽力避免重号）
         let max = 0;
         try {
             const { data } = await _supabase
@@ -932,7 +940,7 @@
                     if (!isNaN(n) && n > max) max = n;
                 }
             });
-        } catch (e) { /* 取号失败则从 1 开始 */ }
+        } catch (e2) { /* 忽略 */ }
         return prefix + '-' + (max + 1);
     }
 
