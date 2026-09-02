@@ -20,7 +20,8 @@
 
         /* ===== 票据表格：手机可横向滑动 ===== */
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
-        .table-scroll .ticket-table { min-width: 880px; }
+        .table-scroll .ticket-table { min-width: 1000px; }
+        .ticket-table td:first-child { min-width: 96px; white-space: nowrap; }
 
         /* ===== 手机适配 ===== */
         @media (max-width: 720px) {
@@ -117,7 +118,7 @@
         .log-box { background: white; padding: 15px; border-radius: var(--radius); margin-top: 15px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); border: 1px solid #ffe9f1; }
         .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fffafc; padding: 8px; border: 1px solid #ffe9f1; border-radius: 8px; }
 
-        .ticket-no-badge { background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
+        .ticket-no-badge { display:inline-block; white-space:nowrap; min-width:60px; background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 3px 8px; font-size: 0.78rem; }
 
         /* ===== 团员票池 ===== */
         .pool-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-top: 4px solid var(--miku); }
@@ -1039,31 +1040,29 @@
         const poolGrid = document.getElementById('pool-grid');
         if (!poolGrid) return;
 
-        // 汇总全部票，预计算每人的：当前管理票数 / 原主应收 / 转出到谁 / 从谁转入
+        // 汇总全部票：每人显示【当前名下】的票数与应收（原样逻辑）
+        // 另保留"转出/转入"往来统计（基于原主 vs 现主）
         const order = ['大瓜', '星黎', '薯饼', '村民', 'X'];
         const stat = {};
-        order.forEach(n => stat[n] = { inHand: 0, reserved: 0, sold: 0, total: 0, outTo: {}, inFrom: {}, receivable: [] });
+        order.forEach(n => stat[n] = { inHand: 0, reserved: 0, sold: 0, total: 0, outTo: {}, inFrom: {}, soldTickets: [] });
 
         allTickets.forEach(t => {
             const curOwner = operatorOf(t) || '未署名';
-            const orig = originalMoneyOwner(t);
+            const orig = originalOwnerOf(t) || operatorOf(t) || '未署名';
             const n = getSingleTicketCount(t);
 
+            // 当前名下管理（显示与计费都按这个）
             if (order.includes(curOwner)) {
                 const s = stat[curOwner];
                 s.total += n;
                 if (t.status === '在手') s.inHand += n;
                 else if (t.status === '预定') s.reserved += n;
-                else if (t.status === '已出') s.sold += n;
+                else if (t.status === '已出') { s.sold += n; s.soldTickets.push(t); }
             }
-            // 往来：原主 != 当前管理人 → 原主转出给当前管理人一张
-            if (order.includes(orig) && order.includes(curOwner) && orig !== curOwner) {
-                stat[orig].outTo[curOwner] = (stat[orig].outTo[curOwner] || 0) + n;
-                stat[curOwner].inFrom[orig] = (stat[curOwner].inFrom[orig] || 0) + n;
-            }
-            // 应收：已出的票记在原主头上
-            if (t.status === '已出' && order.includes(orig)) {
-                stat[orig].receivable.push(t);
+            // 往来：原主 != 当前管理人 → 原主转出给当前管理人（保留记录）
+            if (orig !== curOwner) {
+                if (order.includes(orig)) stat[orig].outTo[curOwner] = (stat[orig].outTo[curOwner] || 0) + n;
+                if (order.includes(curOwner)) stat[curOwner].inFrom[orig] = (stat[curOwner].inFrom[orig] || 0) + n;
             }
         });
 
@@ -1071,13 +1070,13 @@
         let html = '';
         order.forEach(name => {
             const s = stat[name];
-            const recv = sumReceivable(s.receivable);
+            const recv = sumReceivable(s.soldTickets);
             const outText = Object.keys(s.outTo).length
                 ? Object.entries(s.outTo).map(([k, v]) => `${k}${v}张`).join(' ')
-                : '无';
+                : '—';
             const inText = Object.keys(s.inFrom).length
                 ? Object.entries(s.inFrom).map(([k, v]) => `${k}${v}张`).join(' ')
-                : '无';
+                : '—';
             html += `
                 <div class="member-card" onclick="openMemberModal('${name}')">
                     <div class="m-name">${name}</div>
@@ -1087,8 +1086,8 @@
                         <span>🔴已出 <b>${s.sold}</b></span>
                     </div>
                     <div style="font-size:0.75rem; color:#888; margin-top:5px;">共 ${s.total} 张</div>
-                    <div style="font-size:0.72rem; color:#b388eb; margin-top:2px;" title="作为原票主应收（钱归原主）">💰应收 ${formatReceivable(recv)}</div>
-                    <div style="font-size:0.68rem; color:#aaa; margin-top:2px;">📤转出 ${outText}　📥转入 ${inText}</div>
+                    <div style="font-size:0.72rem; color:#b388eb; margin-top:2px;" title="当前名下已出的应收合计">💰应收 ${formatReceivable(recv)}</div>
+                    <div style="font-size:0.68rem; color:#aaa; margin-top:2px;" title="转出=我名下的票给了别人；转入=别人的票给了我">📤转出 ${outText}　📥转入 ${inText}</div>
                 </div>`;
         });
 
@@ -1107,64 +1106,53 @@
         document.getElementById('pool-total-money').innerText = `全团应收(已出)：${formatReceivable(allRecv)}`;
     }
 
-    // 成员明细弹窗：显示 名下在管的票 + 转出给谁/从谁转入 + 作为原主的应收明细
+    // 成员明细弹窗：显示 当前名下的票与应收 + 转入来自谁/转出给谁
     function openMemberModal(name) {
         document.getElementById('member-modal-title').innerText = `🎤 ${name} 的票务`;
         const body = document.getElementById('member-modal-body');
 
-        const mine = allTickets.filter(t => operatorOf(t) === name);                       // 名下在管的
-        const asOrig = allTickets.filter(t => originalMoneyOwner(t) === name);              // 作为原票主的（含已转出）
-        const myOut = allTickets.filter(t => originalMoneyOwner(t) === name && operatorOf(t) !== name); // 转出去给别人
-        const myIn = allTickets.filter(t => operatorOf(t) === name && originalMoneyOwner(t) !== name);  // 从别人转入
+        const mine = allTickets.filter(t => operatorOf(t) === name);          // 名下在管
+        const myOut = allTickets.filter(t => {                                 // 转出去给别人（我的票，现主≠我）
+            const orig = originalOwnerOf(t) || '';
+            return orig === name && operatorOf(t) !== name;
+        });
+        const myIn = mine.filter(t => {                                        // 从别人转入（原主≠我）
+            const orig = originalOwnerOf(t) || '';
+            return orig && orig !== name;
+        });
 
-        const recv = sumReceivable(asOrig.filter(t => t.status === '已出'));
-        const recvList = asOrig.filter(t => t.status === '已出');
+        const recv = sumReceivable(mine.filter(t => t.status === '已出'));      // 应收 = 名下已出
 
         let html = '';
         html += `<div style="margin-bottom:8px; background:#fdeef4; padding:8px 10px; border-radius:8px; font-size:0.85rem;">`;
-        html += `<div style="color:#d63384; font-weight:bold;">💰 作为原票主的应收(已出)合计：${formatReceivable(recv)}</div>`;
-        html += `<div style="color:#888; margin-top:3px;">当前名下管理 ${mine.length} 组 · 作为原主共 ${asOrig.length} 组</div>`;
+        html += `<div style="color:#d63384; font-weight:bold;">💰 名下应收(已出)合计：${formatReceivable(recv)}</div>`;
+        html += `<div style="color:#888; margin-top:3px;">名下管理 ${mine.length} 组</div>`;
+        if (myIn.length) {
+            const g = {};
+            myIn.forEach(t => { const o = originalOwnerOf(t) || '?'; g[o] = (g[o] || 0) + getSingleTicketCount(t); });
+            html += `<div style="color:#00897b; margin-top:3px;">📥 从 ${Object.entries(g).map(([k,v]) => k + ' 转入 ' + v + '张').join('，')}</div>`;
+        }
         if (myOut.length) {
             const g = {};
             myOut.forEach(t => { const o = operatorOf(t) || '?'; g[o] = (g[o] || 0) + getSingleTicketCount(t); });
             html += `<div style="color:#b388eb; margin-top:3px;">📤 转出给：${Object.entries(g).map(([k,v]) => k + ' ' + v + '张').join('，')}</div>`;
         }
-        if (myIn.length) {
-            const g = {};
-            myIn.forEach(t => { const o = originalMoneyOwner(t) || '?'; g[o] = (g[o] || 0) + getSingleTicketCount(t); });
-            html += `<div style="color:#b388eb; margin-top:3px;">📥 从 ${Object.entries(g).map(([k,v]) => k + ' 转入 ' + v + '张').join('，')}</div>`;
-        }
         html += '</div>';
 
         if (mine.length === 0) {
-            html += '<div style="color:#999;">名下暂无在管票据</div>';
+            html += '<div style="color:#999;">名下暂无票据</div>';
         } else {
             html += '<table class="ticket-table"><thead><tr><th>票号</th><th>场馆</th><th>区域/座位</th><th>状态</th><th>买家</th><th>价格</th></tr></thead><tbody>' +
                 mine.map(t => {
                     const block = parseBlockFromNote(t.note);
                     const loc = `${block && block !== 'UNASSIGNED' ? block + '区' : '待定'} ${t.seat || '待分配'}`;
                     const statusIcon = t.status === '在手' ? '🟢' : t.status === '预定' ? '🟠' : '🔴';
+                    const fromTag = originalOwnerOf(t) ? `<span style="color:#d63384; font-size:0.68rem;"> 转自${esc(originalOwnerOf(t))}</span>` : '';
                     return `<tr>
                         <td>${esc(ticketNoMapById[t.id] || t.id)}</td>
                         <td>${esc(t.show || '')}</td>
                         <td>${esc(loc)}</td>
                         <td>${statusIcon} ${esc(t.status)}</td>
-                        <td>${esc(t.buyer || '')}</td>
-                        <td>${esc(formatTicketPrice(t.price))}</td>
-                    </tr>`;
-                }).join('') + '</tbody></table>';
-        }
-
-        if (recvList.length) {
-            html += '<div style="margin-top:10px; font-size:0.85rem;"><b style="color:#d63384;">应文明细（作为原主已出）：</b></div><table class="ticket-table"><thead><tr><th>票号</th><th>现归属</th><th>场馆</th><th>区域/座位</th><th>买家</th><th>价格</th></tr></thead><tbody>' +
-                recvList.map(t => {
-                    const block = parseBlockFromNote(t.note);
-                    const loc = `${block && block !== 'UNASSIGNED' ? block + '区' : '待定'} ${t.seat || '待分配'}`;
-                    return `<tr>
-                        <td>${esc(ticketNoMapById[t.id] || t.id)}</td>
-                        <td>${esc(operatorOf(t) || '-')}</td>
-                        <td>${esc(t.show || '')}</td>
-                        <td>${esc(loc)}</td>
                         <td>${esc(t.buyer || '')}</td>
                         <td>${esc(formatTicketPrice(t.price))}</td>
                     </tr>`;
