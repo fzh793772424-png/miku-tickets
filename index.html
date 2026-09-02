@@ -147,6 +147,7 @@
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
             <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
             <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
+            <button class="danger-btn" id="btn-clear-all" style="display:none; background:#6a1b9a; border:none; color:white;" onclick="clearAllTickets()">🧨 彻底清空全部（含记录）</button>
         </div>
     </div>
 
@@ -305,6 +306,7 @@
     // 登录会话状态
     let authUser = null;       // { id, email }
     let operatorName = null;   // 当前登录人认领的名字
+    let isAdmin = false;       // 是否管理员（大瓜）
 
     // ===== Supabase Auth：登录 / 注册 / 登出 =====
     async function refreshAuthUI() {
@@ -312,28 +314,33 @@
         authUser = session ? session.user : null;
         if (!authUser) {
             operatorName = null;
+            isAdmin = false;
             document.getElementById('operator-name').innerText = '未登录';
             document.getElementById('operator-email').innerText = '';
             document.getElementById('user-chip').innerText = '未登录';
             document.getElementById('btn-logout').style.display = 'none';
+            document.getElementById('btn-clear-all').style.display = 'none';
             document.getElementById('auth-overlay').style.display = 'flex';
             showAuthTab('login');
             return;
         }
-        // 已登录：查这个邮箱认领的名字
+        // 已登录：查这个邮箱认领的名字 + 是否管理员
         const myEmail = String(authUser.email || '').toLowerCase();
-        const { data, error } = await _supabase.from('members').select('name').eq('email', myEmail).maybeSingle();
+        const { data, error } = await _supabase.from('members').select('name, is_admin').eq('email', myEmail).maybeSingle();
         if (error) { alert('查询身份失败：' + error.message); return; }
         if (data && data.name) {
             operatorName = data.name;
+            isAdmin = !!data.is_admin;
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('operator-name').innerText = operatorName;
             document.getElementById('operator-email').innerText = myEmail;
             document.getElementById('user-chip').innerText = '👤 ' + operatorName;
             document.getElementById('btn-logout').style.display = 'inline-block';
+            document.getElementById('btn-clear-all').style.display = isAdmin ? 'inline-block' : 'none';
             initBoard();
         } else {
             // 账号还没认领名字 → 强制走认领页
+            isAdmin = false;
             document.getElementById('auth-overlay').style.display = 'flex';
             showAuthTab('claim');
             await loadFreeNames('claim-name');
@@ -1177,6 +1184,69 @@
         link.href = URL.createObjectURL(blob);
         link.download = `${currentVenue}_座位数据_${new Date().toLocaleDateString('zh-CN')}.csv`;
         link.click();
+    }
+
+    // 下载一份全量备份 CSV（所有场馆 + 操作记录）到本地
+    function downloadBackup() {
+        const venueTickets = allTickets.slice();
+        let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,备注\n';
+        venueTickets.forEach(t => {
+            let blockCode = '待分配';
+            if (t.note && t.note.includes('BLOCK:')) {
+                const match = t.note.match(/BLOCK:([^\]]+)/);
+                if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
+            }
+            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', t.price || '', t.note || ''].map(csvCell).join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `全量备份_所有场馆_${new Date().toLocaleString('zh-CN').replace(/[/: ]/g, '-')}.csv`;
+        link.click();
+    }
+
+    // 🧨 彻底清空全部（含操作记录）—— 仅管理员（is_admin）可用，需二次输密码验证
+    async function clearAllTickets() {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        if (!isAdmin) {
+            alert('⛔ 你没有权限执行此操作（仅管理员可用）。');
+            return;
+        }
+
+        const totalCount = allTickets.length;
+        if (totalCount === 0) { alert('当前没有任何票据数据，无需清空。'); return; }
+
+        // 第一步：输入管理员自己的登录密码（发到云端验证，网页不保存任何密码）
+        const passInput = prompt(`🧨 高危操作：将彻底清空【所有场馆的 ${totalCount} 条票据 + 全部操作记录】，且不可恢复！\n\n请输入你的登录密码进行验证：`);
+        if (passInput === null) return;
+        if (!passInput) { alert('❌ 未输入密码，操作已取消。'); return; }
+
+        const { error: authErr } = await _supabase.auth.signInWithPassword({ email: String(authUser.email).toLowerCase(), password: passInput });
+        if (authErr) {
+            alert('❌ 密码验证失败：' + authErr.message + '\n操作已取消。');
+            return;
+        }
+
+        // 第二步：自动下载备份
+        if (confirm('✅ 密码验证通过。\n\n是否先自动下载一份全量备份文件（以防误操作）？')) {
+            downloadBackup();
+            alert('📥 备份已开始下载，请确认文件保存成功后再继续。');
+        }
+
+        // 第三步：最终确认
+        if (!confirm(`⚠️⚠️ 最终确认：真的要彻底清空【所有场馆全部数据 + 操作记录】吗？\n此操作不可撤销！（操作人：${operator}）`)) return;
+
+        // 清空所有票据 + 所有操作记录
+        const { error: e1 } = await _supabase.from('tickets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (e1) { alert('清空票据失败：' + e1.message); return; }
+        const { error: e2 } = await _supabase.from('ticket_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (e2) { alert('清空操作记录失败：' + e2.message); return; }
+
+        alert(`✅ 已彻底清空全部票据与操作记录！\n（如已下载备份，可从备份恢复）`);
+        fetchTickets();
+        fetchLogs();
     }
 
     async function clearCurrentVenueTickets() {
