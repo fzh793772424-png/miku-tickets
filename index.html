@@ -50,7 +50,6 @@
         .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
         
-        /* 🆕 Block 角标样式 */
         .block-badge { position: absolute; top: -6px; right: -6px; background: #222; color: white; font-size: 0.65rem; border-radius: 10px; padding: 2px 5px; font-weight: bold; border: 1px solid white; line-height: 1; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
@@ -90,7 +89,6 @@
             <input type="text" id="operator-name" placeholder="请输入你的名字" onchange="saveOperatorName()">
         </div>
         <div>
-            <!-- 🆕 一键导出与复制按钮 -->
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
             <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
             <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
@@ -140,7 +138,6 @@
     <div class="ticket-list-card">
         <div class="list-header-tools">
             <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
-            <!-- 🆕 搜索与状态筛选 -->
             <div style="display:flex; gap:10px; align-items:center;">
                 <select id="filter-status" onchange="renderTicketTable()" style="padding:4px 8px; font-size:0.85rem;">
                     <option value="ALL">全部状态</option>
@@ -159,7 +156,7 @@
                     <th>票源</th>
                     <th>类型</th>
                     <th>座位号</th>
-                    <th>状态</th>
+                    <th>状态 (快捷修改)</th>
                     <th>买家</th>
                     <th>价格</th>
                     <th>操作</th>
@@ -419,7 +416,6 @@
 
         renderTicketTable();
 
-        // 🆕 重置并更新地图 Block 高亮与数字角标
         document.querySelectorAll('.block-box').forEach(el => {
             el.classList.remove('bg-在手', 'bg-预定', 'bg-已出');
             const badge = el.querySelector('.block-badge');
@@ -449,7 +445,7 @@
         });
     }
 
-    // 🆕 条件筛选渲染列表
+    // 📋 条件筛选渲染列表（已增加状态直接下拉修改功能）
     function renderTicketTable() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
@@ -488,13 +484,22 @@
                 const seatDisplay = !isUnassignedSeat ? `<strong style="color:var(--miku);">${t.seat}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 待出票/待分配</span>`;
                 const blockDisplay = blockCode !== '待分配' ? `<strong>${blockCode}</strong>` : `<span style="color:#ff9f1c; font-weight:bold;">❓ 未确定Block</span>`;
 
+                // 🆕 可直接切换状态的下拉框
+                const statusSelectHtml = `
+                    <select onchange="updateTicketStatus('${t.id}', this.value)" style="padding: 3px 6px; border-radius: 4px; font-weight: bold; border: 1px solid #ccc; background: white; cursor: pointer;">
+                        <option value="在手" ${t.status === '在手' ? 'selected' : ''}>🟢 在手</option>
+                        <option value="预定" ${t.status === '预定' ? 'selected' : ''}>🟠 预定</option>
+                        <option value="已出" ${t.status === '已出' ? 'selected' : ''}>🔴 已出</option>
+                    </select>
+                `;
+
                 return `
                     <tr>
                         <td>${blockDisplay}</td>
                         <td>${source}</td>
                         <td>${typeDisplay}</td>
                         <td>${seatDisplay}</td>
-                        <td><span class="dot bg-${t.status}"></span> ${t.status}</td>
+                        <td>${statusSelectHtml}</td>
                         <td>${t.buyer || '-'}</td>
                         <td>${t.price ? '¥' + t.price : '-'}</td>
                         <td>
@@ -504,6 +509,24 @@
                     </tr>
                 `;
             }).join('');
+        }
+    }
+
+    // 🆕 直接切换表格中某条记录的状态
+    async function updateTicketStatus(ticketId, newStatus) {
+        const operator = getOperatorName();
+        if (!operator) {
+            fetchTickets();
+            return;
+        }
+
+        const { error } = await _supabase.from('tickets').update({ status: newStatus }).eq('id', ticketId);
+
+        if (error) {
+            alert('修改状态失败：' + error.message);
+        } else {
+            await addLog('修改状态', `快速修改票据 [ID: ${ticketId}] 状态为: ${newStatus}`);
+            fetchTickets();
         }
     }
 
@@ -519,7 +542,6 @@
         const buyer = document.getElementById('quick-buyer').value.trim();
         const price = document.getElementById('quick-price').value.trim();
 
-        // 🆕 防重验证：如果要录入具体座位，检查是否重复
         if (seat !== '待分配' && block !== 'UNASSIGNED') {
             const existing = getTicket(currentVenue, block, seat);
             if (existing) {
@@ -657,7 +679,6 @@
     }
 
     function toggleSeatSelect(seatStr, el) {
-        // 🆕 占用提示与选中逻辑
         const existing = getTicket(currentVenue, currentBlock, seatStr);
         if (existing && !el.classList.contains('selected')) {
             alert(`📌 提示：座位【${seatStr}】已被选中！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n票价：${existing.price || '无'}`);
@@ -715,7 +736,6 @@
         openSeatModal(currentBlock);
     }
 
-    // 🆕 复制微信/Discord 群文本功能
     function copyTextSummary() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const inHand = venueTickets.filter(t => t.status === '在手').length;
@@ -741,7 +761,6 @@
         navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板，可直接粘到微信群！'));
     }
 
-    // 🆕 导出 CSV Excel 功能
     function exportToCSV() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         if (venueTickets.length === 0) { alert('当前场馆无数据可导出！'); return; }
