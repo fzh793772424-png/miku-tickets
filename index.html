@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <!-- 数据看板 (修正：此处数字统计为真实【张数】，连票自动翻倍) -->
+    <!-- 数据看板 -->
     <div class="stats-card">
         <div class="stat-box"><div>录入记录组数</div><div class="stat-num" id="stat-total">0</div></div>
         <div class="stat-box"><div style="color:#1b9aaa;">在手 (张数)</div><div class="stat-num" id="stat-in-hand" style="color:#2ec4b6;">0</div></div>
@@ -441,7 +441,6 @@
         }
     }
 
-    // 辅助函数：根据单条记录获取真实的【票数】（连票算对应张数）
     function getSingleTicketCount(t) {
         if (t.note) {
             if (t.note.includes('4连')) return 4;
@@ -458,10 +457,8 @@
     function updateStatsAndHighlights() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
 
-        // 记录组数
         document.getElementById('stat-total').innerText = venueTickets.length;
 
-        // 计算各类状态真实票数张数
         let inHandTickets = 0;
         let reservedTickets = 0;
         let soldTickets = 0;
@@ -723,13 +720,27 @@
         fetchTickets();
     }
 
+    // 已更新：携带位置信息的单条删除功能
     async function deleteSingleTicket(ticketId) {
         const operator = getAuthenticatedOperator();
         if (!operator) return;
 
-        if (confirm('确定要删除这组票据记录吗？')) {
+        const targetTicket = allTickets.find(t => t.id === ticketId);
+        
+        let blockInfo = '待分配Block';
+        if (targetTicket && targetTicket.note && targetTicket.note.includes('BLOCK:')) {
+            const match = targetTicket.note.match(/BLOCK:([^\]]+)/);
+            if (match && match[1] !== 'UNASSIGNED') {
+                blockInfo = `${match[1]} Block`;
+            }
+        }
+
+        const seatInfo = (targetTicket && targetTicket.seat) ? targetTicket.seat : '待分配';
+        const locationText = `【${blockInfo} ${seatInfo}】`;
+
+        if (confirm(`确定要删除 ${locationText} 的票据记录吗？`)) {
             await _supabase.from('tickets').delete().eq('id', ticketId);
-            await addLog('删除票据', `删除票据记录 ID: ${ticketId}`);
+            await addLog('删除票据', `删除票据 ${locationText} (ID: ${ticketId})`);
             fetchTickets();
         }
     }
