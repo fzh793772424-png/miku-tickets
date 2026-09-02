@@ -15,6 +15,7 @@
         .tab-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); }
+        .auth-tab.active { background: var(--miku); color: white; border-color: var(--miku); }
 
         .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-wrap: wrap; }
         .operator-bar input, .operator-bar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
@@ -79,8 +80,55 @@
 <div class="container">
     <header>
         <h2>⚡ Magical Mirai 2026 精细座位交互看板</h2>
-        <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接 Supabase…</span>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接…</span>
+            <span id="user-chip" style="font-size:0.9rem; font-weight:bold; color:#39C5BB; background:rgba(255,255,255,0.1); padding:4px 12px; border-radius:20px;">未登录</span>
+            <button class="btn-action" id="btn-logout" style="background:#5c6bc0; display:none;" onclick="authLogout()">🚪 退出登录</button>
+        </div>
     </header>
+
+    <!-- 登录 / 注册 全屏层 -->
+    <div id="auth-overlay" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(20,25,30,0.86); justify-content:center; align-items:flex-start; padding:30px 15px; overflow-y:auto;">
+        <div style="background:white; max-width:430px; width:100%; border-radius:12px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+            <h2 style="margin:0 0 4px; color:#00796b;">🎫 Miku 20th 座位看板</h2>
+            <p style="margin:0 0 14px; color:#888; font-size:0.85rem;">登录后即可协作录入，仅限团队 5 人使用</p>
+
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+                <button class="auth-tab tab-btn active" id="tab-login" onclick="showAuthTab('login')">登录</button>
+                <button class="auth-tab tab-btn" id="tab-register" onclick="showAuthTab('register')">注册</button>
+                <button class="auth-tab tab-btn" id="tab-claim" style="display:none;" onclick="showAuthTab('claim')">认领名字</button>
+            </div>
+
+            <!-- 登录 -->
+            <div class="auth-pane" id="pane-login">
+                <label style="font-weight:bold; font-size:0.9rem;">邮箱</label>
+                <input type="email" id="login-email" placeholder="你的注册邮箱" style="width:100%; box-sizing:border-box; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;">
+                <label style="font-weight:bold; font-size:0.9rem;">密码</label>
+                <input type="password" id="login-pass" placeholder="你的密码" style="width:100%; box-sizing:border-box; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;">
+                <button class="btn-action" style="width:100%; padding:10px; font-size:1rem;" onclick="authLogin()">🔓 登 录</button>
+            </div>
+
+            <!-- 注册 -->
+            <div class="auth-pane" id="pane-register" style="display:none;">
+                <label style="font-weight:bold; font-size:0.9rem;">选择你的名字（每人仅可认领一个，先到先得）</label>
+                <select id="reg-name" style="width:100%; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;"></select>
+                <label style="font-weight:bold; font-size:0.9rem;">邮箱（需能记清，用于登录）</label>
+                <input type="email" id="reg-email" placeholder="例如 yourname@qq.com" style="width:100%; box-sizing:border-box; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;">
+                <label style="font-weight:bold; font-size:0.9rem;">密码（至少 6 位，请自己记好）</label>
+                <input type="password" id="reg-pass" placeholder="设置你的密码" style="width:100%; box-sizing:border-box; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;">
+                <button class="btn-action" style="width:100%; padding:10px; font-size:1rem;" onclick="authRegister()">📝 注册并进入</button>
+            </div>
+
+            <!-- 认领名字（老账号/邮箱验证后首次登录用） -->
+            <div class="auth-pane" id="pane-claim" style="display:none;">
+                <label style="font-weight:bold; font-size:0.9rem;">这个账号还没绑定名字，选一个认领</label>
+                <select id="claim-name" style="width:100%; padding:9px; margin:6px 0 12px; border:1px solid #ccc; border-radius:6px;"></select>
+                <button class="btn-action" style="width:100%; padding:10px; font-size:1rem;" onclick="authClaim()">✅ 确认认领</button>
+            </div>
+
+            <p id="auth-hint" style="margin:14px 0 0; font-size:0.85rem; color:#888; min-height:20px;">👆 新朋友请先点「注册」，选名字建账号。</p>
+        </div>
+    </div>
 
     <div class="tab-bar">
         <button class="tab-btn active" id="btn-tokyo" onclick="switchVenue('东京场')">东京场 (幕张9厅)</button>
@@ -88,20 +136,12 @@
         <button class="tab-btn" id="btn-hiroshima" onclick="switchVenue('广岛场')">广岛场 (上野学园大厅)</button>
     </div>
 
-    <!-- 操作人与密码校验 -->
+    <!-- 操作人（登录后自动显示，无需再选身份输密码） -->
     <div class="operator-bar">
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <span>👤 操作人：</span>
-            <select id="operator-select" onchange="saveOperatorSession()">
-                <option value="">-- 请选择身份 --</option>
-                <option value="大瓜">大瓜</option>
-                <option value="星黎">星黎</option>
-                <option value="薯饼">薯饼</option>
-                <option value="村民">村民</option>
-                <option value="X">X</option>
-            </select>
-            <span>🔑 个人密码：</span>
-            <input type="password" id="operator-pass" placeholder="输入个人密码" style="width:110px;" onchange="saveOperatorSession()">
+            <span>👤 当前操作人：</span>
+            <strong id="operator-name" style="color:#00796b;">未登录</strong>
+            <span id="operator-email" style="font-size:0.8rem; color:#999;"></span>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
@@ -259,17 +299,137 @@
         }
     }
 
-    // 用户个人密码列表
-    const USER_PASSWORDS = {
-        '大瓜': '3939',
-        '星黎': '3939',
-        '薯饼': '3939',
-        '村民': '3939',
-        'X': '3939'
-    };
+    // 允许注册的名字（固定 5 个，存于 members 表，先到先得）
+    const ALLOWED_NAMES = ['大瓜', '星黎', '薯饼', '村民', 'X'];
 
-    // 二级清空高危密码
-    const CLEAR_SECONDARY_PASS = '3939';
+    // 登录会话状态
+    let authUser = null;       // { id, email }
+    let operatorName = null;   // 当前登录人认领的名字
+
+    // ===== Supabase Auth：登录 / 注册 / 登出 =====
+    async function refreshAuthUI() {
+        const { data: { session } } = await _supabase.auth.getSession();
+        authUser = session ? session.user : null;
+        if (!authUser) {
+            operatorName = null;
+            document.getElementById('operator-name').innerText = '未登录';
+            document.getElementById('operator-email').innerText = '';
+            document.getElementById('user-chip').innerText = '未登录';
+            document.getElementById('btn-logout').style.display = 'none';
+            document.getElementById('auth-overlay').style.display = 'flex';
+            showAuthTab('login');
+            return;
+        }
+        // 已登录：查这个邮箱认领的名字
+        const myEmail = String(authUser.email || '').toLowerCase();
+        const { data, error } = await _supabase.from('members').select('name').eq('email', myEmail).maybeSingle();
+        if (error) { alert('查询身份失败：' + error.message); return; }
+        if (data && data.name) {
+            operatorName = data.name;
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('operator-name').innerText = operatorName;
+            document.getElementById('operator-email').innerText = myEmail;
+            document.getElementById('user-chip').innerText = '👤 ' + operatorName;
+            document.getElementById('btn-logout').style.display = 'inline-block';
+            initBoard();
+        } else {
+            // 账号还没认领名字 → 强制走认领页
+            document.getElementById('auth-overlay').style.display = 'flex';
+            showAuthTab('claim');
+            await loadFreeNames('claim-name');
+        }
+    }
+
+    function showAuthTab(tab) {
+        document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.auth-pane').forEach(p => p.style.display = 'none');
+        const btn = document.getElementById('tab-' + tab);
+        if (btn) btn.classList.add('active');
+        const pane = document.getElementById('pane-' + tab);
+        if (pane) pane.style.display = 'block';
+        if (tab === 'register') loadFreeNames('reg-name');
+        if (tab === 'claim') loadFreeNames('claim-name');
+    }
+
+    // 查询哪些名字还没被占，填充下拉框（空 → 返回提示）
+    async function loadFreeNames(selectId) {
+        const sel = document.getElementById(selectId);
+        const { data } = await _supabase.from('members').select('name');
+        const taken = new Set((data || []).map(r => r.name));
+        const free = ALLOWED_NAMES.filter(n => !taken.has(n));
+        if (free.length === 0) {
+            sel.innerHTML = '<option value="">( 5 个名字已全部被占用 )</option>';
+            sel.disabled = true;
+        } else {
+            sel.innerHTML = '<option value="">-- 请选择 --</option>' + free.map(n => `<option value="${n}">${n}</option>`).join('');
+            sel.disabled = false;
+        }
+        return free;
+    }
+
+    async function authLogin() {
+        const email = document.getElementById('login-email').value.trim();
+        const pass = document.getElementById('login-pass').value;
+        const hint = document.getElementById('auth-hint');
+        if (!email || !pass) { hint.innerText = '⚠️ 请输入邮箱和密码'; return; }
+        const { error } = await _supabase.auth.signInWithPassword({ email, password: pass });
+        if (error) {
+            hint.innerText = '❌ 登录失败：' + error.message + '（密码错误？请找管理员重置）';
+            return;
+        }
+        hint.innerText = '';
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-pass').value = '';
+        await refreshAuthUI();
+    }
+
+    async function authRegister() {
+        const hint = document.getElementById('auth-hint');
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value.trim();
+        const pass = document.getElementById('reg-pass').value;
+
+        if (!name) { hint.innerText = '⚠️ 请先选择一个名字'; return; }
+        if (!/^\S+@\S+\.\S+$/.test(email)) { hint.innerText = '⚠️ 邮箱格式不对，请检查'; return; }
+        if (pass.length < 6) { hint.innerText = '⚠️ 密码至少 6 位'; return; }
+
+        const { data, error } = await _supabase.auth.signUp({ email, password: pass });
+        if (error) { hint.innerText = '❌ 注册失败：' + error.message; return; }
+
+        // 若开启了邮箱确认，这里没有 session，需要先去邮箱点确认再登录认领
+        if (!data.session) {
+            hint.innerText = '📧 账号已创建。请到邮箱查收确认邮件并点击确认，然后回来登录认领名字。';
+            return;
+        }
+
+        // 注册成功且已自动登录 → 抢占这个名字
+        const { error: mErr } = await _supabase.from('members').insert({ name: name, email: email.toLowerCase() });
+        if (mErr) {
+            hint.innerText = '❌ 名字认领失败：' + mErr.message + '（可能刚被别人抢了，请换一个名字重试）';
+            return;
+        }
+        hint.innerText = '';
+        document.getElementById('reg-name').value = '';
+        document.getElementById('reg-email').value = '';
+        document.getElementById('reg-pass').value = '';
+        await refreshAuthUI();
+    }
+
+    async function authClaim() {
+        const hint = document.getElementById('auth-hint');
+        const name = document.getElementById('claim-name').value;
+        if (!name) { hint.innerText = '⚠️ 请选择一个名字认领'; return; }
+        if (!authUser) { hint.innerText = '⚠️ 请先登录'; return; }
+        const { error } = await _supabase.from('members').insert({ name: name, email: authUser.email.toLowerCase() });
+        if (error) { hint.innerText = '❌ 认领失败：' + error.message; return; }
+        hint.innerText = '';
+        await refreshAuthUI();
+    }
+
+    async function authLogout() {
+        await _supabase.auth.signOut();
+        location.reload();
+    }
 
     let currentVenue = '东京场';
     let allTickets = [];
@@ -318,9 +478,15 @@
     };
 
     function init() {
-        document.getElementById('operator-select').value = localStorage.getItem('miku_op_user') || '';
-        document.getElementById('operator-pass').value = localStorage.getItem('miku_op_pass') || '';
-        renderCurrentVenue();
+        renderCurrentVenue();   // 先画好场馆布局（纯静态，不涉及数据）
+        refreshAuthUI();        // 检查登录状态，决定显示登录页还是看板
+    }
+
+    // 登录并认领名字成功后，才加载数据 + 开启实时同步（只执行一次）
+    let boardStarted = false;
+    function initBoard() {
+        if (boardStarted) return;
+        boardStarted = true;
         fetchTickets();
         fetchLogs();
 
@@ -341,22 +507,13 @@
         updateStatsAndHighlights();
     }
 
-    function saveOperatorSession() {
-        localStorage.setItem('miku_op_user', document.getElementById('operator-select').value);
-        localStorage.setItem('miku_op_pass', document.getElementById('operator-pass').value);
-    }
-
+    // 身份一律取"已登录且已认领的名字"（服务端 RLS 已禁止匿名访问）
     function getAuthenticatedOperator() {
-        const user = document.getElementById('operator-select').value;
-        const pass = document.getElementById('operator-pass').value.trim();
-
-        if (!user) { alert('⚠️ 请先选择操作人身份！'); return null; }
-        const correctPass = USER_PASSWORDS[user] || '3939';
-        if (pass !== correctPass) {
-            alert(`❌ 个人密码错误，请检查后再试！`);
+        if (!operatorName) {
+            alert('⚠️ 请先登录并认领你的名字！');
             return null;
         }
-        return user;
+        return operatorName;
     }
 
     function getBlockKeys() {
@@ -1026,26 +1183,30 @@
         const operator = getAuthenticatedOperator();
         if (!operator) return;
 
-        const secPassInput = prompt(`⚠️ 高危警告：即将彻底清空【${currentVenue}】的全量数据！\n此操作不可撤销，请输入【二级清空专用密码】：`);
-        if (secPassInput !== CLEAR_SECONDARY_PASS) {
-            alert('❌ 二级清空密码验证失败，操作取消！');
+        const count = allTickets.filter(t => t.show === currentVenue).length;
+        if (count === 0) { alert('当前场馆没有数据，无需清空。'); return; }
+
+        // 安全确认：必须输入「清空」二字（不再是写死的前端密码，日志会记录是谁干的）
+        const confirmWord = prompt(`⚠️ 高危警告：即将彻底清空【${currentVenue}】的全部 ${count} 条记录，此操作不可撤销！\n\n请输入「清空」二字确认：`);
+        if (confirmWord !== '清空') {
+            alert('❌ 确认词输入不正确，操作已取消！');
             return;
         }
 
-        if (!confirm(`⚠️⚠️ 最后确认：真的要清空【${currentVenue}】的全部 ${allTickets.filter(t => t.show === currentVenue).length} 条记录吗？`)) return;
+        if (!confirm(`⚠️⚠️ 最后确认：真的要清空【${currentVenue}】的全部 ${count} 条记录吗？（操作人：${operator}）`)) return;
 
         const { error } = await _supabase.from('tickets').delete().eq('show', currentVenue);
         if (error) {
             alert('清空失败：' + error.message);
             return;
         }
-        await addLog('彻底清空', `清空了【${currentVenue}】的全量票据数据`);
+        await addLog('彻底清空', `清空了【${currentVenue}】的全量票据数据（共 ${count} 条）`);
         alert(`✅ 【${currentVenue}】的所有票据已被彻底清空！`);
         fetchTickets();
     }
 
     async function addLog(action, detail) {
-        const operator = document.getElementById('operator-select').value || '未知用户';
+        const operator = operatorName || '未知用户';
         try {
             await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
         } catch (e) {
