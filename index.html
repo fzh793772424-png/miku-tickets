@@ -905,6 +905,25 @@
         return allTickets.find(t => String(t.id) === sid);
     }
 
+    // 检查某位置(show+block+任意座位)是否已被【别的票】占用
+    // ticketId 传 null 表示新增；返回占用它的票对象或 null
+    function findOccupant(show, block, seatText, excludeTicketId) {
+        if (!show || !block || block === 'UNASSIGNED') return null;
+        const s = String(seatText == null ? '' : seatText).trim();
+        if (!s || s === '待分配') return null;
+        const seatParts = s.split(',').map(x => x.trim()).filter(Boolean);
+        for (let part of seatParts) {
+            const found = allTickets.find(t =>
+                t.show === show &&
+                t.note && t.note.includes(`BLOCK:${block}`) &&
+                String(t.id) !== String(excludeTicketId) &&
+                seatListOf(t).includes(part)
+            );
+            if (found) return found;
+        }
+        return null;
+    }
+
     // 日志里描述一张票：大瓜-1｜东京场 A5区 10列8番
     function ticketDesc(t) {
         if (!t) return '未知票';
@@ -1432,6 +1451,13 @@
         }
 
         const finalBlock = (updatedNote.match(/BLOCK:([^\]]+)/) || [])[1] || '';
+        // 前端预检：目标座位若已被别的票占用，直接拒绝（不依赖云端拦截）
+        const occupant = findOccupant(currentVenue, finalBlock, newSeatValue, ticketId);
+        if (occupant) {
+            alert(`⚠️ 无法修改：座位已属于 ${ticketDesc(occupant)}！\n同一个位置不能有第二张票（请先处理那张票，或换个座位）。`);
+            fetchTickets(); // 还原输入框
+            return;
+        }
         const uniqKey = seatDedupKey(currentVenue, finalBlock, newSeatValue);
         const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
         if (error) {
@@ -1463,6 +1489,13 @@
 
         // 座位保持不变只换区块 → 去重键要重算（座位串取目标原座位）
         const seatOfTicket = (target.seat || '').trim();
+        // 前端预检：新区块里这个座位若已被别的票占用 → 拒绝
+        const occupant = findOccupant(currentVenue, newBlock, seatOfTicket, ticketId);
+        if (occupant) {
+            alert(`⚠️ 无法修改：新区域 ${newBlock} 里这个座位已属于 ${ticketDesc(occupant)}！`);
+            fetchTickets();
+            return;
+        }
         const uniqKey = seatDedupKey(currentVenue, newBlock, seatOfTicket);
         const { error } = await _supabase.from('tickets').update({ note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
         if (error) {
