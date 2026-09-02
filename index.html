@@ -623,6 +623,42 @@
         seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : esc(s)}">${esc(s)}</option>`).join('');
     }
 
+    // ===== 友好票号：日志显示"大瓜-1｜东京场 A5区 10列8番"，方便定位是哪张 =====
+    let ticketNoMapById = {};
+
+    function parseBlockFromNote(note) {
+        if (note && note.includes('BLOCK:')) {
+            const m = note.match(/BLOCK:([^\]]+)/);
+            if (m) return m[1];
+        }
+        return '';
+    }
+
+    // 数据每次刷新后重建：按"场馆+操作人"给每张票编友好号（大瓜-1、星黎-2…）
+    function rebuildTicketNoMap() {
+        ticketNoMapById = {};
+        const counter = {};
+        allTickets.forEach(t => {
+            let op = '票';
+            if (t.note && t.note.includes('BY:')) {
+                const m = t.note.match(/BY:([^\]]+)/);
+                if (m) op = m[1];
+            }
+            const key = (t.show || '?') + '|' + op;
+            counter[key] = (counter[key] || 0) + 1;
+            ticketNoMapById[t.id] = `${op}-${counter[key]}`;
+        });
+    }
+
+    // 日志里描述一张票：大瓜-1｜东京场 A5区 10列8番
+    function ticketDesc(t) {
+        if (!t) return '未知票';
+        const no = ticketNoMapById[t.id] || `票#${t.id}`;
+        const block = parseBlockFromNote(t.note);
+        const blockStr = block && block !== 'UNASSIGNED' ? block + '区' : '待定区';
+        return `${no}｜${t.show || ''} ${blockStr} ${t.seat || '待分配'}`;
+    }
+
     async function fetchTickets() {
         try {
             const { data, error } = await _supabase
@@ -632,6 +668,7 @@
             if (error) throw error;
             if (data) {
                 allTickets = data;
+                rebuildTicketNoMap();
                 updateStatsAndHighlights();
             }
         } catch (e) {
@@ -729,19 +766,6 @@
         const filterStatus = document.getElementById('filter-status').value;
         const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
 
-        const userTicketCounters = {};
-        const ticketNoMap = {};
-
-        venueTickets.forEach(t => {
-            let opName = '票';
-            if (t.note && t.note.includes('BY:')) {
-                const match = t.note.match(/BY:([^\]]+)/);
-                if (match) opName = match[1];
-            }
-            userTicketCounters[opName] = (userTicketCounters[opName] || 0) + 1;
-            ticketNoMap[t.id] = `${opName}-${userTicketCounters[opName]}`;
-        });
-
         const filtered = venueTickets.filter(t => {
             let matchesStatus = true;
             if (filterStatus === 'UNASSIGNED') {
@@ -755,7 +779,7 @@
                 matchesKW = (t.seat && t.seat.toLowerCase().includes(keyword)) ||
                             (t.buyer && t.buyer.toLowerCase().includes(keyword)) ||
                             (t.note && t.note.toLowerCase().includes(keyword)) ||
-                            (ticketNoMap[t.id] && ticketNoMap[t.id].toLowerCase().includes(keyword));
+                            (ticketNoMapById[t.id] && ticketNoMapById[t.id].toLowerCase().includes(keyword));
             }
             return matchesStatus && matchesKW;
         });
@@ -780,7 +804,7 @@
                 else if (t.note && t.note.includes('3连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👨‍👦‍👦 3连</span>`;
                 else if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
 
-                const ticketNo = ticketNoMap[t.id] || '票-';
+                const ticketNo = ticketNoMapById[t.id] || '票-';
 
                 const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
                     .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
@@ -853,7 +877,8 @@
         const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote }).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
-            await addLog('修改座位', `修改票据 [${ticketId}] 座位为: ${newSeatValue}`);
+            const t2 = allTickets.find(x => x.id === ticketId);
+            await addLog('修改座位', `修改 ${ticketDesc(t2 || target)} → 座位改为: ${newSeatValue}`);
             fetchTickets();
         }
     }
@@ -876,7 +901,8 @@
         const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', ticketId);
         if (error) alert('修改Block失败：' + error.message);
         else {
-            await addLog('修改区域', `将票据 [${ticketId}] 的区域调整为: ${newBlock}`);
+            const t2 = allTickets.find(x => x.id === ticketId);
+            await addLog('修改区域', `将 ${ticketDesc(t2 || target)} 的区域调整为: ${newBlock}`);
             fetchTickets();
         }
     }
@@ -891,7 +917,9 @@
         const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
-            await addLog('修改信息', `修改票据 [${ticketId}] 的 ${field} 为: ${value}`);
+            const target = allTickets.find(t => t.id === ticketId);
+            const fieldLabel = field === 'status' ? '状态' : field === 'buyer' ? '买家' : field === 'price' ? '价格' : field;
+            await addLog('修改信息', `将 ${ticketDesc(target)} 的${fieldLabel}改为: ${value}`);
             fetchTickets();
         }
     }
@@ -955,7 +983,7 @@
             const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
             if (error) alert('删除失败：' + error.message);
             else {
-                await addLog('删除票据', `删除票据 ${locationText} (ID: ${ticketId})`);
+                await addLog('删除票据', `删除 ${ticketDesc(targetTicket)}（原 ${locationText}）`);
                 fetchTickets();
             }
         }
