@@ -33,15 +33,13 @@
         .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 6px; text-align: center; }
         .ticket-table th { background: #f4f6f7; font-weight: bold; }
 
-        /* 表格内输入框与下拉样式 */
         .table-input { width: 90%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 0.85rem; }
         .table-input:focus { border-color: var(--miku); outline: none; background: #e0f2f1; }
         .table-select { padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-weight: bold; }
 
         .btn-action { background: var(--miku); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
         .btn-action:hover { opacity: 0.9; }
-        .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        .danger-btn:hover { background: #b80c21; }
+        .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
 
         .legend { display: flex; gap: 20px; justify-content: center; margin: 10px 0; font-size: 0.85rem; font-weight: bold; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
@@ -55,7 +53,7 @@
         .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
         
-        .block-badge { position: absolute; top: -6px; right: -6px; background: #222; color: white; font-size: 0.65rem; border-radius: 10px; padding: 2px 5px; font-weight: bold; border: 1px solid white; line-height: 1; }
+        .block-badge { position: absolute; top: -8px; right: -8px; background: #222; color: white; font-size: 0.7rem; border-radius: 10px; padding: 2px 6px; font-weight: bold; border: 1px solid white; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
@@ -90,7 +88,7 @@
         <button class="tab-btn" id="btn-hiroshima" onclick="switchVenue('广岛场')">广岛场 (上野学园大厅)</button>
     </div>
 
-    <!-- 🔑 操作人与独立密码验证 -->
+    <!-- 操作人与验证 -->
     <div class="operator-bar">
         <div style="display:flex; gap:10px; align-items:center;">
             <span>👤 操作人：</span>
@@ -112,7 +110,7 @@
         </div>
     </div>
 
-    <!-- 📊 顶部数据看板 -->
+    <!-- 数据看板 -->
     <div class="stats-card">
         <div class="stat-box"><div>录入记录组数</div><div class="stat-num" id="stat-total">0</div></div>
         <div class="stat-box"><div style="color:#1b9aaa;">在手</div><div class="stat-num" id="stat-in-hand" style="color:#2ec4b6;">0</div></div>
@@ -122,9 +120,9 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- 🎫 录入表单 -->
+    <!-- 表单录入 -->
     <div class="quick-add-card">
-        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入（也可直接点击下方地图进行打点录入）：</strong>
+        <strong style="font-size:1rem; color:#00796b;">✍️ 快捷票据录入：</strong>
         <div class="form-row">
             <select id="quick-block" onchange="updateSeatDropdown()" style="font-weight:bold; color:#00796b;">
                 <option value="UNASSIGNED">❓ 待分配 / 未出票 (无具体Block)</option>
@@ -151,7 +149,7 @@
         </div>
     </div>
 
-    <!-- 📋 票据明细与筛选列表 -->
+    <!-- 票据明细列表 -->
     <div class="ticket-list-card">
         <div class="list-header-tools">
             <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
@@ -202,12 +200,12 @@
     </div>
 </div>
 
-<!-- 座位点阵 Modal -->
+<!-- 座位 Modal -->
 <div id="seatModal" class="modal" onclick="closeModal()">
     <div class="modal-content" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeModal()">&times;</span>
         <h3 id="modal-title" style="margin-top:0;">Block 座位详情</h3>
-        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 点击座位多选/取消，选完后点击保存。已被占用的座位再次点击可快速查看或重置。</div>
+        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 点击座位多选/取消，选完后点击保存。</div>
         
         <div id="seat-grid-container" class="seat-grid"></div>
 
@@ -231,14 +229,7 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 🔒 预设密码表
-    const USER_PASSWORDS = {
-        '大瓜': '3939',
-        '星黎': '1234',
-        '薯饼': '4321',
-        '村民': '3939',
-        'X': '6666'
-    };
+    const USER_PASSWORDS = { '大瓜': '3939', '星黎': '1234', '薯饼': '4321', '村民': '3939', 'X': '6666' };
 
     let currentVenue = '东京场';
     let allTickets = [];
@@ -293,7 +284,6 @@
         fetchTickets();
         fetchLogs();
 
-        // 📡 Realtime 监听 - 全员实时同步数据与日志
         _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets()).subscribe();
         _supabase.channel('logs').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs()).subscribe();
     }
@@ -457,6 +447,7 @@
 
         renderTicketTable();
 
+        // 刷新地图样式与 Badge 计数
         document.querySelectorAll('.block-box').forEach(el => {
             el.classList.remove('bg-在手', 'bg-预定', 'bg-已出');
             const badge = el.querySelector('.block-badge');
@@ -464,20 +455,25 @@
         });
 
         const blockCounts = {};
+        const blockStatusMap = {};
+
         venueTickets.forEach(t => {
             let blockCode = '';
             if (t.note && t.note.includes('BLOCK:')) {
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match) blockCode = match[1];
             }
+
             if (blockCode && blockCode !== 'UNASSIGNED') {
-                const el = document.getElementById(`block-${blockCode}`);
-                if (el) el.classList.add(`bg-${t.status}`);
                 blockCounts[blockCode] = (blockCounts[blockCode] || 0) + 1;
+                blockStatusMap[blockCode] = t.status; // 记录状态高亮
             }
         });
 
         Object.keys(blockCounts).forEach(code => {
+            const el = document.getElementById(`block-${code}`);
+            if (el) el.classList.add(`bg-${blockStatusMap[code]}`);
+
             const badge = document.getElementById(`badge-${code}`);
             if (badge) {
                 badge.innerText = blockCounts[code];
@@ -539,7 +535,6 @@
                 const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="color:#00796b; font-weight:bold;">👭 2连</span>` : `👤 单人`;
                 const ticketNo = ticketNoMap[t.id] || '票-';
 
-                // 块（Block）可直接下拉选择修改
                 const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
                     .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
                     .join('');
@@ -560,7 +555,7 @@
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待出票/分配" onchange="updateTicketField('${t.id}', 'seat', this.value)">
+                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待出票/分配" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
                         </td>
                         <td>${statusSelectHtml}</td>
                         <td>
@@ -578,7 +573,38 @@
         }
     }
 
-    // 修改 Block 关联
+    // 手打座位号时，自动提取 Block 名称（如打 "A2 1列1番" 自动设为 A2）
+    async function updateTicketSeatAuto(ticketId, newSeatValue, oldNote) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) { fetchTickets(); return; }
+
+        let updatedNote = oldNote;
+        let detectedBlock = '';
+        const blockKeys = getBlockKeys();
+
+        for (let k of blockKeys) {
+            if (newSeatValue.toUpperCase().startsWith(k)) {
+                detectedBlock = k;
+                break;
+            }
+        }
+
+        if (detectedBlock) {
+            if (updatedNote.includes('BLOCK:')) {
+                updatedNote = updatedNote.replace(/BLOCK:[^\]]+/, `BLOCK:${detectedBlock}`);
+            } else {
+                updatedNote = `[BLOCK:${detectedBlock}]` + updatedNote;
+            }
+        }
+
+        const { error } = await _supabase.from('tickets').update({ seat: newSeatValue.trim(), note: updatedNote }).eq('id', ticketId);
+        if (error) alert('更新失败：' + error.message);
+        else {
+            await addLog('修改座位', `修改票据 [${ticketId}] 座位为: ${newSeatValue}`);
+            fetchTickets();
+        }
+    }
+
     async function updateTicketBlock(ticketId, newBlock, oldNote) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
@@ -593,7 +619,7 @@
         const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', ticketId);
         if (error) alert('修改Block失败：' + error.message);
         else {
-            await addLog('修改区块', `将票据 [${ticketId}] 的区域调整为: ${newBlock}`);
+            await addLog('修改区域', `将票据 [${ticketId}] 的区域调整为: ${newBlock}`);
             fetchTickets();
         }
     }
@@ -768,7 +794,7 @@
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]);
 
-        await addLog('打点多选录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
+        await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
         
         fetchTickets();
         openSeatModal(currentBlock);
@@ -812,7 +838,7 @@
             txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) - ${t.price ? '¥'+t.price : '无价格'}\n`;
         });
 
-        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板，可直接粘到微信群！'));
+        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板！'));
     }
 
     function exportToCSV() {
