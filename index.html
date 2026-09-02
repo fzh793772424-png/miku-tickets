@@ -6,15 +6,23 @@
     <title>Magical Mirai 2026 精细座位交互看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root { --miku: #39C5BB; --bg: #f0f3f4; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #333; }
+        :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-lav: #9b8cff; --bg: #f4f9f9; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(180deg, #e8f8f6 0%, var(--bg) 240px, var(--bg) 100%); margin: 0; padding: 15px; color: #333; }
         .container { max-width: 1400px; margin: 0 auto; }
-        
-        header { background: #222; color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--miku); }
-        
+
+        /* ===== 初音主题横幅 ===== */
+        .miku-banner { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 6px 24px rgba(57,197,187,0.25); border: 1px solid rgba(57,197,187,0.35); }
+        .miku-banner img { display: block; width: 100%; height: 150px; object-fit: cover; }
+        .miku-banner .banner-overlay { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,60,55,0.55) 0%, rgba(0,0,0,0) 60%); display: flex; align-items: center; padding: 0 28px; }
+        .miku-banner .banner-title { color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.5); font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; }
+        .miku-banner .banner-title small { display: block; font-size: 0.85rem; font-weight: 400; opacity: 0.9; letter-spacing: 1px; margin-top: 4px; }
+
+        header { background: linear-gradient(120deg, #12423e 0%, #0e5a54 45%, #00897b 100%); color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--miku); box-shadow: 0 3px 14px rgba(57,197,187,0.3); }
+
         .tab-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
-        .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); }
+        .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 999px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .tab-btn:hover { border-color: var(--miku); box-shadow: 0 0 0 3px rgba(57,197,187,0.15); }
+        .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); box-shadow: 0 3px 12px rgba(57,197,187,0.4); }
         .auth-tab.active { background: var(--miku); color: white; border-color: var(--miku); }
 
         .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-wrap: wrap; }
@@ -72,12 +80,43 @@
         .log-box { background: white; padding: 15px; border-radius: 8px; margin-top: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fafafa; padding: 8px; border: 1px solid #eee; }
 
-        .ticket-no-badge { background: #333; color: white; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
+        .ticket-no-badge { background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; }
+
+        /* ===== 团员票池 ===== */
+        .pool-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-top: 4px solid var(--miku); }
+        .pool-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .pool-header h3 { margin: 0; font-size: 1.05rem; color: #00796b; }
+        .pool-header .pool-hint { font-size: 0.8rem; color: #999; }
+        .pool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+        .member-card { border: 1px solid #e3eef0; border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: all 0.2s; background: linear-gradient(180deg,#fbfffe,#f0faf9); }
+        .member-card:hover { border-color: var(--miku); box-shadow: 0 4px 16px rgba(57,197,187,0.35); transform: translateY(-2px); }
+        .member-card .m-name { font-weight: 800; color: #00796b; font-size: 0.95rem; }
+        .member-card .m-counts { display: flex; gap: 10px; margin-top: 8px; font-size: 0.8rem; }
+        .member-card .m-counts span b { font-size: 1rem; }
+        .pool-total { margin-top: 12px; padding: 10px 14px; background: linear-gradient(120deg,#e0f7f5,#fdeef4); border-radius: 10px; font-size: 0.9rem; color: #00695c; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+        /* ===== 音符跳动动画 ===== */
+        @keyframes miku-note { 0%,100% { transform: translateY(0) rotate(0deg); opacity: 0.7; } 50% { transform: translateY(-6px) rotate(10deg); opacity: 1; } }
+        .miku-note { display: inline-block; animation: miku-note 1.6s ease-in-out infinite; }
+
+        /* 加载音符 */
+        #loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.92); z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.6rem; color: #00897b; }
+        .note-bounce { display: inline-block; animation: miku-note 1.2s ease-in-out infinite; }
+        .note-bounce:nth-child(2) { animation-delay: 0.15s; }
+        .note-bounce:nth-child(3) { animation-delay: 0.3s; }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <!-- 初音横幅 -->
+    <div class="miku-banner">
+        <img src="img/2.JPG" alt="Magical Mirai banner">
+        <div class="banner-overlay">
+            <div class="banner-title">🎤 Magical Mirai 2026<small>初音ミク ライブ チケット管理 ✧ みんなで協力！</small></div>
+        </div>
+    </div>
+
     <header>
         <h2>⚡ Magical Mirai 2026 精细座位交互看板</h2>
         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -89,9 +128,15 @@
 
     <!-- 登录 / 注册 全屏层 -->
     <div id="auth-overlay" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(20,25,30,0.86); justify-content:center; align-items:flex-start; padding:30px 15px; overflow-y:auto;">
-        <div style="background:white; max-width:430px; width:100%; border-radius:12px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4);">
-            <h2 style="margin:0 0 4px; color:#00796b;">🎫 Miku 20th 座位看板</h2>
-            <p style="margin:0 0 14px; color:#888; font-size:0.85rem;">登录后即可协作录入，仅限团队 5 人使用</p>
+        <div style="background:white; max-width:430px; width:100%; border-radius:12px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4); border-top: 6px solid var(--miku);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+                <img src="img/1.JPG" alt="miku" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:3px solid var(--miku); box-shadow:0 3px 10px rgba(57,197,187,0.5);">
+                <div>
+                    <h2 style="margin:0; color:#00796b;">🎵 Miku 20th 座位看板</h2>
+                    <p style="margin:2px 0 0; color:#999; font-size:0.8rem;">✧ みんなで協力して 39 (サンキュー) ✧</p>
+                </div>
+            </div>
+            <p style="margin:10px 0 14px; color:#888; font-size:0.85rem;">登录后即可协作录入，仅限团队 5 人使用</p>
 
             <div style="display:flex; gap:8px; margin-bottom:16px;">
                 <button class="auth-tab tab-btn active" id="tab-login" onclick="showAuthTab('login')">登录</button>
@@ -161,6 +206,19 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
+    <!-- 🎤 团员票池：全场馆按人汇总 -->
+    <div class="pool-card">
+        <div class="pool-header">
+            <h3>🎤 团员票池 <span class="miku-note">🎵</span> <span style="font-size:0.85rem; color:#00897b;">( 三场馆合计 )</span></h3>
+            <span class="pool-hint">点击成员卡片查看该成员名下的票</span>
+        </div>
+        <div class="pool-grid" id="pool-grid"><!-- JS 动态生成 --></div>
+        <div class="pool-total">
+            <span id="pool-total-text">全团合计：加载中…</span>
+            <span id="pool-total-money"></span>
+        </div>
+    </div>
+
     <!-- 表单录入 -->
     <div class="quick-add-card">
         <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入 (也可直接点击下方地图打点录入)：</strong>
@@ -218,10 +276,11 @@
                     <th>买家 (直接修改)</th>
                     <th>价格 (直接修改)</th>
                     <th>操作</th>
+                    <th>历史</th>
                 </tr>
             </thead>
             <tbody id="ticket-list-body">
-                <tr><td colspan="8" style="color:#999;">暂无录入票据</td></tr>
+                <tr><td colspan="9" style="color:#999;">暂无录入票据</td></tr>
             </tbody>
         </table>
     </div>
@@ -240,6 +299,24 @@
     <div class="log-box">
         <h3>📖 实时操作日志 (全员同步)</h3>
         <div id="log-list" class="log-list"></div>
+    </div>
+</div>
+
+<!-- 成员票池明细 Modal -->
+<div id="memberModal" class="modal" onclick="closeMemberModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <span class="close-btn" onclick="closeMemberModal()">&times;</span>
+        <h3 id="member-modal-title" style="margin-top:0;">🎤 成员名下票据</h3>
+        <div id="member-modal-body" style="font-size:0.9rem;"></div>
+    </div>
+</div>
+
+<!-- 票据历史 Modal -->
+<div id="historyModal" class="modal" onclick="closeHistoryModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width:700px;">
+        <span class="close-btn" onclick="closeHistoryModal()">&times;</span>
+        <h3 id="history-modal-title" style="margin-top:0;">📜 票据历史记录</h3>
+        <div id="history-modal-body" style="font-size:0.9rem;"></div>
     </div>
 </div>
 
@@ -693,6 +770,145 @@
         return 1;
     }
 
+    // ===== 🎤 团员票池：全场馆按人汇总 =====
+    // 从票的 note 里取操作人（BY:xxx）
+    function operatorOf(t) {
+        if (t.note && t.note.includes('BY:')) {
+            const m = t.note.match(/BY:([^\]]+)/);
+            if (m) return m[1].trim();
+        }
+        return '';
+    }
+
+    function ticketMoney(t) {
+        const p = parseFloat(t.price);
+        return isNaN(p) ? 0 : p;
+    }
+
+    function renderPool() {
+        const poolGrid = document.getElementById('pool-grid');
+        if (!poolGrid) return;
+
+        // 聚合：三场馆所有票，按操作人分
+        const agg = {};
+        allTickets.forEach(t => {
+            const op = operatorOf(t) || '未署名';
+            if (!agg[op]) agg[op] = { inHand: 0, reserved: 0, sold: 0, tickets: [] };
+            const n = getSingleTicketCount(t);
+            const money = ticketMoney(t);
+            if (t.status === '在手') agg[op].inHand += n;
+            else if (t.status === '预定') agg[op].reserved += n;
+            else if (t.status === '已出') agg[op].sold += n;
+            agg[op].tickets.push({ t, n, money });
+        });
+
+        // 固定顺序展示 5 个名字，没票也显示 0
+        const order = ['大瓜', '星黎', '薯饼', '村民', 'X'];
+        let html = '';
+        order.forEach(name => {
+            const a = agg[name] || { inHand: 0, reserved: 0, sold: 0, tickets: [] };
+            const total = a.inHand + a.reserved + a.sold;
+            html += `
+                <div class="member-card" onclick="openMemberModal('${name}')">
+                    <div class="m-name">${name}</div>
+                    <div class="m-counts">
+                        <span>🟢在手 <b>${a.inHand}</b></span>
+                        <span>🟠预定 <b>${a.reserved}</b></span>
+                        <span>🔴已出 <b>${a.sold}</b></span>
+                    </div>
+                    <div style="font-size:0.75rem; color:#888; margin-top:6px;">共 ${total} 张</div>
+                </div>`;
+        });
+        // 未署名的（老数据无 BY）也展示一下，避免"消失的票"
+        Object.keys(agg).forEach(name => {
+            if (order.includes(name)) return;
+            const a = agg[name];
+            const total = a.inHand + a.reserved + a.sold;
+            html += `
+                <div class="member-card" style="opacity:0.85;" onclick="openMemberModal('${esc(name)}')">
+                    <div class="m-name">${esc(name)}</div>
+                    <div class="m-counts"><span style="color:#999;">共 ${total} 张（未署名）</span></div>
+                </div>`;
+        });
+
+        poolGrid.innerHTML = html || '<div style="color:#999;">暂无任何票</div>';
+
+        // 底部合计
+        let allTotal = 0, allMoney = 0, dom = 0, over = 0;
+        allTickets.forEach(t => {
+            const n = getSingleTicketCount(t);
+            allTotal += n;
+            allMoney += ticketMoney(t);
+            if (t.note && t.note.includes('本土票')) dom += n;
+            if (t.note && t.note.includes('海外票')) over += n;
+        });
+        document.getElementById('pool-total-text').innerText = `全团合计：${allTickets.length} 组 / ${allTotal} 张　(本土 ${dom} · 海外 ${over})`;
+        document.getElementById('pool-total-money').innerText = `预计总金额 ¥${allMoney}`;
+    }
+
+    // 成员明细弹窗
+    function openMemberModal(name) {
+        document.getElementById('member-modal-title').innerText = `🎤 ${name} 名下票据`;
+        const mine = allTickets.filter(t => operatorOf(t) === name);
+        const body = document.getElementById('member-modal-body');
+        if (mine.length === 0) {
+            body.innerHTML = '<div style="color:#999;">该成员名下暂无票据</div>';
+        } else {
+            body.innerHTML = '<table class="ticket-table"><thead><tr><th>票号</th><th>场馆</th><th>区域/座位</th><th>状态</th><th>买家</th><th>价格</th></tr></thead><tbody>' +
+                mine.map(t => {
+                    const block = parseBlockFromNote(t.note);
+                    const loc = `${block && block !== 'UNASSIGNED' ? block + '区' : '待定'} ${t.seat || '待分配'}`;
+                    const statusIcon = t.status === '在手' ? '🟢' : t.status === '预定' ? '🟠' : '🔴';
+                    return `<tr>
+                        <td>${esc(ticketNoMapById[t.id] || t.id)}</td>
+                        <td>${esc(t.show || '')}</td>
+                        <td>${esc(loc)}</td>
+                        <td>${statusIcon} ${esc(t.status)}</td>
+                        <td>${esc(t.buyer || '')}</td>
+                        <td>${t.price ? '¥' + esc(t.price) : ''}</td>
+                    </tr>`;
+                }).join('') + '</tbody></table>';
+        }
+        document.getElementById('memberModal').style.display = 'flex';
+    }
+    function closeMemberModal() { document.getElementById('memberModal').style.display = 'none'; }
+
+    // ===== 📜 票据历史：查 ticket_logs 里关联此票的记录 =====
+    async function openTicketHistory(ticketId) {
+        const tid = Number(ticketId);
+        const target = findTicketById(ticketId);
+        document.getElementById('history-modal-title').innerText = `📜 ${ticketDesc(target || { id: ticketId })} 的历史`;
+        const body = document.getElementById('history-modal-body');
+        body.innerHTML = '<div style="color:#888;">加载中…</div>';
+        document.getElementById('historyModal').style.display = 'flex';
+
+        try {
+            const { data, error } = await _supabase
+                .from('ticket_logs')
+                .select('*')
+                .eq('ticket_id', tid)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                body.innerHTML = '<div style="color:#999;">📭 这张票暂时没有操作历史记录。<br><br><small>（v11 起所有操作都会自动留档；v11 之前的旧记录无法回溯到单票。）</small></div>';
+                return;
+            }
+            body.innerHTML = data.map(l => `
+                <div style="padding:8px 0; border-bottom:1px dashed #eee; display:flex; gap:10px; align-items:flex-start;">
+                    <span style="color:#00897b; white-space:nowrap; font-weight:bold;">${esc(l.operator)}</span>
+                    <span style="flex:1;">
+                        <span style="color:#00796b;">${esc(l.action)}</span>：${esc(l.detail)}
+                        <div style="color:#bbb; font-size:0.75rem;">${new Date(l.created_at).toLocaleString('zh-CN')}</div>
+                    </span>
+                </div>`).join('');
+        } catch (e) {
+            // 可能 ticket_logs 还没加 ticket_id 列 → 提示用户跑 SQL
+            body.innerHTML = '<div style="color:#e71d36;">⚠️ 查询失败：' + esc(e.message) + '<br><br>如果提示 "column ticket_id does not exist"，请先在 Supabase SQL Editor 里运行建列 SQL（找管理员要）。</div>';
+        }
+    }
+    function closeHistoryModal() { document.getElementById('historyModal').style.display = 'none'; }
+
     // 区块颜色优先级：已出 > 预定 > 在手（防止多条记录互相覆盖导致颜色随机）
     const STATUS_PRIORITY = { '已出': 3, '预定': 2, '在手': 1 };
 
@@ -728,6 +944,7 @@
         document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
         renderTicketTable();
+        renderPool();
 
         document.querySelectorAll('.block-box').forEach(el => {
             el.classList.remove('bg-在手', 'bg-预定', 'bg-已出');
@@ -794,7 +1011,7 @@
         const blockKeys = getBlockKeys();
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">无符合条件数据</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="9" style="color:#999;">无符合条件数据</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map(t => {
                 let blockCode = 'UNASSIGNED';
@@ -844,6 +1061,9 @@
                         <td>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
                         </td>
+                        <td>
+                            <button onclick="openTicketHistory('${t.id}')" style="font-size:0.75rem; background:#5c6bc0; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">📜 历史</button>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -884,7 +1104,7 @@
         if (error) alert('更新失败：' + error.message);
         else {
             const t2 = findTicketById(ticketId);
-            await addLog('修改座位', `修改 ${ticketDesc(t2 || target)} → 座位改为: ${newSeatValue}`);
+            await addLog('修改座位', `修改 ${ticketDesc(t2 || target)} → 座位改为: ${newSeatValue}`, ticketId);
             fetchTickets();
         }
     }
@@ -908,7 +1128,7 @@
         if (error) alert('修改Block失败：' + error.message);
         else {
             const t2 = findTicketById(ticketId);
-            await addLog('修改区域', `将 ${ticketDesc(t2 || target)} 的区域调整为: ${newBlock}`);
+            await addLog('修改区域', `将 ${ticketDesc(t2 || target)} 的区域调整为: ${newBlock}`, ticketId);
             fetchTickets();
         }
     }
@@ -925,7 +1145,7 @@
         else {
             const target = findTicketById(ticketId);
             const fieldLabel = field === 'status' ? '状态' : field === 'buyer' ? '买家' : field === 'price' ? '价格' : field;
-            await addLog('修改信息', `将 ${ticketDesc(target)} 的${fieldLabel}改为: ${value}`);
+            await addLog('修改信息', `将 ${ticketDesc(target)} 的${fieldLabel}改为: ${value}`, ticketId);
             fetchTickets();
         }
     }
@@ -950,18 +1170,20 @@
             }
         }
 
-        const { error } = await _supabase.from('tickets').insert([{
+        // 插入后取回新票 id（用于历史档案关联）
+        const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: seat,
             status: status,
             buyer: buyer,
             price: price,
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
-        }]);
+        }]).select('id');
         if (error) { alert('录入失败：' + error.message); return; }
+        const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
         const blockLogStr = block !== 'UNASSIGNED' ? `${block}区` : '未确定Block';
-        await addLog('录入票据', `新增【${currentVenue} ${blockLogStr} ${seat}】 ${type} (${source}, ${status})`);
+        await addLog('录入票据', `新增【${currentVenue} ${blockLogStr} ${seat}】 ${type} (${source}, ${status})`, newId);
 
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
@@ -989,7 +1211,7 @@
             const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
             if (error) alert('删除失败：' + error.message);
             else {
-                await addLog('删除票据', `删除 ${ticketDesc(targetTicket)}（原 ${locationText}）`);
+                await addLog('删除票据', `删除 ${ticketDesc(targetTicket)}（原 ${locationText}）`, ticketId);
                 fetchTickets();
             }
         }
@@ -1116,17 +1338,18 @@
         else if (selectedSeatsArray.length === 3) typeStr = '3连番';
         else if (selectedSeatsArray.length >= 4) typeStr = '4连番';
 
-        const { error } = await _supabase.from('tickets').insert([{
+        const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: combinedSeats,
             status: status,
             buyer: buyer,
             price: price,
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
-        }]);
+        }]).select('id');
         if (error) { alert('保存失败：' + error.message); return; }
+        const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
-        await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
+        await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`, newId);
         
         document.getElementById('set-buyer').value = '';
         document.getElementById('set-price').value = '';
@@ -1153,9 +1376,9 @@
             if (existing) {
                 const { error } = await _supabase.from('tickets').delete().eq('id', existing.id);
                 if (error) { alert('清除失败：' + error.message); return; }
+                await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】座位: ${seatStr}`, existing.id);
             }
         }
-        await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】的座位记录: ${toDelete.join(',')}`);
         fetchTickets();
         openSeatModal(currentBlock);
     }
@@ -1309,10 +1532,13 @@
         fetchTickets();
     }
 
-    async function addLog(action, detail) {
+    // 记录操作日志；ticketId 存在时写入关联票号（供"票据历史"查询），旧版数据没有此列不影响
+    async function addLog(action, detail, ticketId) {
         const operator = operatorName || '未知用户';
         try {
-            await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
+            const row = { operator, action, detail };
+            if (ticketId !== undefined && ticketId !== null && ticketId !== '') row.ticket_id = Number(ticketId);
+            await _supabase.from('ticket_logs').insert([row]);
         } catch (e) {
             // 日志写入失败不影响主流程，仅静默
         }
