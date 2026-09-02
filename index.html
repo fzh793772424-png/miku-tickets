@@ -894,8 +894,8 @@
     }
 
     // 数据每次刷新后重建 id → 票号 映射：
-    // 编号跟随【当前主人】(BY)动态排：同场馆内每人从 1 开始（星黎-1、星黎-2…）
-    // 转票后 BY 变了 → 这张票自然排进新主人的编号里
+    // 编号按【张】分配并跟随当前主人(BY)：同场馆内每人连续编号
+    // 2连票 = 两张 → 占两个号，显示如 大瓜-1,2；单人 → 大瓜-3
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
         const counter = {};
@@ -903,8 +903,12 @@
         allTickets.forEach(t => {
             const owner = operatorOf(t) || '未署名';
             const key = (t.show || '?') + '|' + owner;
-            counter[key] = (counter[key] || 0) + 1;
-            ticketNoMapById[t.id] = `${owner}-${counter[key]}`;
+            const startNo = (counter[key] || 0) + 1;
+            const piece = getSingleTicketCount(t) || 1;   // 2连=2 → 占2个号
+            counter[key] = startNo + piece - 1;
+            const nums = [];
+            for (let i = startNo; i < startNo + piece; i++) nums.push(i);
+            ticketNoMapById[t.id] = nums.length > 1 ? `${owner}-${nums.join(',')}` : `${owner}-${startNo}`;
         });
     }
 
