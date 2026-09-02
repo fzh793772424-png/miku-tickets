@@ -1238,10 +1238,10 @@
         // 第三步：最终确认
         if (!confirm(`⚠️⚠️ 最终确认：真的要彻底清空【所有场馆全部数据 + 操作记录】吗？\n此操作不可撤销！（操作人：${operator}）`)) return;
 
-        // 清空所有票据 + 所有操作记录
-        const { error: e1 } = await _supabase.from('tickets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // 清空所有票据 + 所有操作记录（id 为自增数字，永不为 0，用 0 作为"删全部"的安全锚点）
+        const { error: e1 } = await _supabase.from('tickets').delete().neq('id', 0);
         if (e1) { alert('清空票据失败：' + e1.message); return; }
-        const { error: e2 } = await _supabase.from('ticket_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        const { error: e2 } = await _supabase.from('ticket_logs').delete().neq('id', 0);
         if (e2) { alert('清空操作记录失败：' + e2.message); return; }
 
         alert(`✅ 已彻底清空全部票据与操作记录！\n（如已下载备份，可从备份恢复）`);
