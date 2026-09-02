@@ -16,7 +16,7 @@
         .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); }
 
-        .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .operator-bar { background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-wrap: wrap; }
         .operator-bar input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #00796b; }
         
         .stats-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; text-align: center; }
@@ -28,10 +28,13 @@
         .form-row input, .form-row select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
 
         .ticket-list-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .ticket-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
+        .list-header-tools { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .ticket-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .ticket-table th, .ticket-table td { border: 1px solid #eee; padding: 8px; text-align: center; }
         .ticket-table th { background: #f4f6f7; font-weight: bold; }
 
+        .btn-action { background: var(--miku); color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-action:hover { opacity: 0.9; }
         .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         .danger-btn:hover { background: #b80c21; }
 
@@ -43,9 +46,12 @@
         .map-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-x: auto; }
         
         .block-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
-        .block-box { border: 1px solid #dcdcdc; background: #fdfdfd; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; }
+        .block-box { border: 1px solid #dcdcdc; background: #fdfdfd; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; position: relative; }
         .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
+        
+        /* 🆕 Block 角标样式 */
+        .block-badge { position: absolute; top: -6px; right: -6px; background: #222; color: white; font-size: 0.65rem; border-radius: 10px; padding: 2px 5px; font-weight: bold; border: 1px solid white; line-height: 1; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
@@ -56,7 +62,7 @@
         .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; font-weight: bold; }
 
         .seat-grid { display: grid; gap: 4px; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 6px; border: 1px solid #eee; overflow-x: auto; }
-        .seat-node { width: 28px; height: 28px; border: 1px solid #ccc; background: white; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .seat-node { width: 28px; height: 28px; border: 1px solid #ccc; background: white; border-radius: 3px; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
         .seat-node:hover { border-color: var(--miku); background: #e0f2f1; }
         .seat-node.selected { background: var(--miku) !important; color: white !important; font-weight: bold; border-color: #00796b !important; }
 
@@ -83,7 +89,12 @@
             <span>👤 操作人署名：</span>
             <input type="text" id="operator-name" placeholder="请输入你的名字" onchange="saveOperatorName()">
         </div>
-        <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 彻底清空【当前场馆】所有票据 (密码3939)</button>
+        <div>
+            <!-- 🆕 一键导出与复制按钮 -->
+            <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
+            <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
+            <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
+        </div>
     </div>
 
     <!-- 📊 顶部数据看板 -->
@@ -96,9 +107,9 @@
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
-    <!-- 🎫 录入/打点表单 (Block 包含未出/待分配选项) -->
+    <!-- 🎫 录入/打点表单 -->
     <div class="quick-add-card">
-        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入与选择：</strong>
+        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入与快捷打点：</strong>
         <div class="form-row">
             <select id="quick-block" onchange="updateSeatDropdown()" style="font-weight:bold; color:#00796b;">
                 <option value="UNASSIGNED">❓ 待分配 / 未出票 (无具体Block)</option>
@@ -121,13 +132,26 @@
             </select>
             <input type="text" id="quick-buyer" placeholder="买家(选填)" style="width:100px;">
             <input type="text" id="quick-price" placeholder="总价格(选填)" style="width:100px;">
-            <button onclick="addQuickTicket()" style="background:var(--miku); color:white; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer;">+ 确认录入</button>
+            <button onclick="addQuickTicket()" class="btn-action">+ 确认录入</button>
         </div>
     </div>
 
-    <!-- 📋 票据明细与汇总列表 -->
+    <!-- 📋 票据明细与筛选列表 -->
     <div class="ticket-list-card">
-        <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
+        <div class="list-header-tools">
+            <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
+            <!-- 🆕 搜索与状态筛选 -->
+            <div style="display:flex; gap:10px; align-items:center;">
+                <select id="filter-status" onchange="renderTicketTable()" style="padding:4px 8px; font-size:0.85rem;">
+                    <option value="ALL">全部状态</option>
+                    <option value="在手">在手</option>
+                    <option value="预定">预定</option>
+                    <option value="已出">已出</option>
+                    <option value="UNASSIGNED">仅看待分配</option>
+                </select>
+                <input type="text" id="filter-keyword" oninput="renderTicketTable()" placeholder="搜索座位/买家..." style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;">
+            </div>
+        </div>
         <table class="ticket-table">
             <thead>
                 <tr>
@@ -169,7 +193,7 @@
     <div class="modal-content" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeModal()">&times;</span>
         <h3 id="modal-title" style="margin-top:0;">Block 座位详情</h3>
-        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 点击座位多选/取消，选完后点击保存。待分配票据可在顶部直接录入，出票后再补填。</div>
+        <div id="modal-subtext" style="font-size:0.85rem; color:#666;">💡 点击座位多选/取消，选完后点击保存。已被占用的座位再次点击可快速查看或重置。</div>
         
         <div id="seat-grid-container" class="seat-grid"></div>
 
@@ -182,8 +206,8 @@
             </select>
             <input type="text" id="set-buyer" placeholder="买家(选填)" style="width:100px;">
             <input type="text" id="set-price" placeholder="价格(选填)" style="width:80px;">
-            <button onclick="saveSeatTicketsMulti()" style="background:var(--miku); color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">保存选中座位</button>
-            <button onclick="deleteSeatTicketsMulti()" style="background:#e71d36; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer;">清除选中座位的票</button>
+            <button onclick="saveSeatTicketsMulti()" class="btn-action">保存选中座位</button>
+            <button onclick="deleteSeatTicketsMulti()" class="danger-btn" style="padding:6px 12px;">清除选中座位</button>
         </div>
     </div>
 </div>
@@ -306,7 +330,10 @@
     }
 
     function makeBlockHtml(code, label) {
-        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')"><div class="block-title">${label}</div></div>`;
+        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')">
+            <span class="block-badge" id="badge-${code}" style="display:none;">0</span>
+            <div class="block-title">${label}</div>
+        </div>`;
     }
 
     function populateBlockDropdown() {
@@ -390,11 +417,66 @@
         });
         document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
+        renderTicketTable();
+
+        // 🆕 重置并更新地图 Block 高亮与数字角标
+        document.querySelectorAll('.block-box').forEach(el => {
+            el.classList.remove('bg-在手', 'bg-预定', 'bg-已出');
+            const badge = el.querySelector('.block-badge');
+            if (badge) badge.style.display = 'none';
+        });
+
+        const blockCounts = {};
+        venueTickets.forEach(t => {
+            let blockCode = '';
+            if (t.note && t.note.includes('BLOCK:')) {
+                const match = t.note.match(/BLOCK:([^\]]+)/);
+                if (match) blockCode = match[1];
+            }
+            if (blockCode && blockCode !== 'UNASSIGNED') {
+                const el = document.getElementById(`block-${blockCode}`);
+                if (el) el.classList.add(`bg-${t.status}`);
+                blockCounts[blockCode] = (blockCounts[blockCode] || 0) + 1;
+            }
+        });
+
+        Object.keys(blockCounts).forEach(code => {
+            const badge = document.getElementById(`badge-${code}`);
+            if (badge) {
+                badge.innerText = blockCounts[code];
+                badge.style.display = 'block';
+            }
+        });
+    }
+
+    // 🆕 条件筛选渲染列表
+    function renderTicketTable() {
+        const venueTickets = allTickets.filter(t => t.show === currentVenue);
+        const filterStatus = document.getElementById('filter-status').value;
+        const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
+
+        const filtered = venueTickets.filter(t => {
+            let matchesStatus = true;
+            if (filterStatus === 'UNASSIGNED') {
+                matchesStatus = !t.seat || t.seat.includes('待分配') || (t.note && t.note.includes('BLOCK:UNASSIGNED'));
+            } else if (filterStatus !== 'ALL') {
+                matchesStatus = t.status === filterStatus;
+            }
+
+            let matchesKW = true;
+            if (keyword) {
+                matchesKW = (t.seat && t.seat.toLowerCase().includes(keyword)) ||
+                            (t.buyer && t.buyer.toLowerCase().includes(keyword)) ||
+                            (t.note && t.note.toLowerCase().includes(keyword));
+            }
+            return matchesStatus && matchesKW;
+        });
+
         const tbody = document.getElementById('ticket-list-body');
-        if (venueTickets.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">暂无数据</td></tr>`;
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">无符合条件数据</td></tr>`;
         } else {
-            tbody.innerHTML = venueTickets.map(t => {
+            tbody.innerHTML = filtered.map(t => {
                 let blockCode = '待分配';
                 if (t.note && t.note.includes('BLOCK:')) {
                     const match = t.note.match(/BLOCK:([^\]]+)/);
@@ -423,19 +505,6 @@
                 `;
             }).join('');
         }
-
-        document.querySelectorAll('.block-box').forEach(el => el.classList.remove('bg-在手', 'bg-预定', 'bg-已出'));
-        venueTickets.forEach(t => {
-            let blockCode = '';
-            if (t.note && t.note.includes('BLOCK:')) {
-                const match = t.note.match(/BLOCK:([^\]]+)/);
-                if (match) blockCode = match[1];
-            }
-            if (blockCode && blockCode !== 'UNASSIGNED') {
-                const el = document.getElementById(`block-${blockCode}`);
-                if (el) el.classList.add(`bg-${t.status}`);
-            }
-        });
     }
 
     async function addQuickTicket() {
@@ -449,6 +518,15 @@
         const status = document.getElementById('quick-status').value;
         const buyer = document.getElementById('quick-buyer').value.trim();
         const price = document.getElementById('quick-price').value.trim();
+
+        // 🆕 防重验证：如果要录入具体座位，检查是否重复
+        if (seat !== '待分配' && block !== 'UNASSIGNED') {
+            const existing = getTicket(currentVenue, block, seat);
+            if (existing) {
+                alert(`⚠️ 录入失败：【${block} Block ${seat}】已经被分配给买家 [${existing.buyer || '未填写'}] (${existing.status})！`);
+                return;
+            }
+        }
 
         await _supabase.from('tickets').insert([{
             show: currentVenue,
@@ -478,7 +556,6 @@
                 const newBlock = parts[0].trim();
                 const newSeatStr = parts.slice(1).join(',').trim();
                 
-                // 查找原始票据并更新 note 中的 Block
                 const currentT = allTickets.find(t => t.id === ticketId);
                 let newNote = currentT ? currentT.note : '';
                 if (newNote.includes('BLOCK:')) {
@@ -580,6 +657,12 @@
     }
 
     function toggleSeatSelect(seatStr, el) {
+        // 🆕 占用提示与选中逻辑
+        const existing = getTicket(currentVenue, currentBlock, seatStr);
+        if (existing && !el.classList.contains('selected')) {
+            alert(`📌 提示：座位【${seatStr}】已被选中！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n票价：${existing.price || '无'}`);
+        }
+
         const index = selectedSeatsArray.indexOf(seatStr);
         if (index > -1) {
             selectedSeatsArray.splice(index, 1);
@@ -630,6 +713,54 @@
         await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】的座位记录: ${selectedSeatsArray.join(',')}`);
         fetchTickets();
         openSeatModal(currentBlock);
+    }
+
+    // 🆕 复制微信/Discord 群文本功能
+    function copyTextSummary() {
+        const venueTickets = allTickets.filter(t => t.show === currentVenue);
+        const inHand = venueTickets.filter(t => t.status === '在手').length;
+        const reserved = venueTickets.filter(t => t.status === '预定').length;
+        const sold = venueTickets.filter(t => t.status === '已出').length;
+        const unassigned = venueTickets.filter(t => !t.seat || t.seat.includes('待分配') || (t.note && t.note.includes('BLOCK:UNASSIGNED'))).length;
+
+        let txt = `🎫 【Magical Mirai 2026 - ${currentVenue} 票据实时汇总】\n`;
+        txt += `------------------------------------\n`;
+        txt += `📊 总记录数：${venueTickets.length} 组 | 待出票/待分配：${unassigned} 张\n`;
+        txt += `🟢 在手：${inHand} | 🟠 预定：${reserved} | 🔴 已出：${sold}\n\n`;
+        txt += `📋 明细列表：\n`;
+
+        venueTickets.forEach((t, i) => {
+            let blockCode = '待定Block';
+            if (t.note && t.note.includes('BLOCK:')) {
+                const match = t.note.match(/BLOCK:([^\]]+)/);
+                if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
+            }
+            txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) - ${t.price ? '¥'+t.price : '无价格'}\n`;
+        });
+
+        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板，可直接粘到微信群！'));
+    }
+
+    // 🆕 导出 CSV Excel 功能
+    function exportToCSV() {
+        const venueTickets = allTickets.filter(t => t.show === currentVenue);
+        if (venueTickets.length === 0) { alert('当前场馆无数据可导出！'); return; }
+
+        let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,备注\n';
+        venueTickets.forEach(t => {
+            let blockCode = '待分配';
+            if (t.note && t.note.includes('BLOCK:')) {
+                const match = t.note.match(/BLOCK:([^\]]+)/);
+                if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
+            }
+            csv += `"${t.show}","${blockCode}","${t.seat || '待分配'}","${t.status}","${t.buyer || ''}","${t.price || ''}","${t.note || ''}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${currentVenue}_座位数据_${new Date().toLocaleDateString('zh-CN')}.csv`;
+        link.click();
     }
 
     async function clearCurrentVenueTickets() {
