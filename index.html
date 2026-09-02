@@ -1604,15 +1604,24 @@
         fetchTickets();
     }
 
-    // 记录操作日志；ticketId 存在时写入关联票号（供"票据历史"查询），旧版数据没有此列不影响
+    // 记录操作日志；ticketId 存在时写入关联票号（供"票据历史"查询）
     async function addLog(action, detail, ticketId) {
         const operator = operatorName || '未知用户';
         try {
             const row = { operator, action, detail };
             if (ticketId !== undefined && ticketId !== null && ticketId !== '') row.ticket_id = Number(ticketId);
-            await _supabase.from('ticket_logs').insert([row]);
+            const { error } = await _supabase.from('ticket_logs').insert([row]);
+            if (error) throw error;
         } catch (e) {
-            // 日志写入失败不影响主流程，仅静默
+            // 日志失败要让人看见，避免"悄悄没记录"
+            console.error('日志写入失败:', e);
+            const logList = document.getElementById('log-list');
+            if (logList) {
+                const msg = e.message && e.message.includes('ticket_id')
+                    ? '⚠️ 日志表缺少 ticket_id 列，请在 Supabase SQL Editor 运行：alter table public.ticket_logs add column if not exists ticket_id bigint;'
+                    : '⚠️ 日志写入失败：' + (e.message || '未知错误');
+                logList.innerHTML = `<div style="color:#e71d36; font-size:0.8rem;">${esc(msg)}</div>` + logList.innerHTML;
+            }
         }
     }
 
