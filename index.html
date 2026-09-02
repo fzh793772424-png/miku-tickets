@@ -249,7 +249,6 @@
         <div class="stat-box"><div style="color:#e58e00;">预定 (张数)</div><div class="stat-num" id="stat-reserved" style="color:#ff9f1c;">0</div></div>
         <div class="stat-box"><div style="color:#b80c21;">已出 (张数)</div><div class="stat-num" id="stat-sold" style="color:#e71d36;">0</div></div>
         <div class="stat-box"><div>本土 / 海外 (张数)</div><div class="stat-num" id="stat-source" style="font-size:1.1rem; margin-top:8px;">0 / 0</div></div>
-        <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
     <!-- 🎤 团员票池：全场馆按人汇总 -->
@@ -261,7 +260,7 @@
         <div class="pool-grid" id="pool-grid"><!-- JS 动态生成 --></div>
         <div class="pool-total">
             <span id="pool-total-text">全团合计：加载中…</span>
-            <span id="pool-total-money"></span>
+            <span id="pool-total-money" style="color:#d63384;">应收 (已出)：加载中…</span>
         </div>
     </div>
 
@@ -282,16 +281,18 @@
             <select id="quick-type">
                 <option value="单人票">单人票</option>
                 <option value="2连番">2 连番</option>
-                <option value="3连番">3 连番</option>
-                <option value="4连番">4 连番</option>
             </select>
             <select id="quick-status">
                 <option value="在手">状态：在手</option>
                 <option value="预定">状态：预定</option>
                 <option value="已出">状态：已出</option>
             </select>
+            <select id="quick-currency" onchange="updateCurrencyDisplay()">
+                <option value="CNY">人民币</option>
+                <option value="JPY">日元</option>
+            </select>
+            <input type="text" id="quick-price" placeholder="金额(选填)" style="width:90px;">
             <input type="text" id="quick-buyer" placeholder="买家(选填)" style="width:100px;">
-            <input type="text" id="quick-price" placeholder="总价格(选填)" style="width:100px;">
             <button onclick="addQuickTicket()" class="btn-action">+ 确认录入</button>
         </div>
     </div>
@@ -321,7 +322,7 @@
                     <th>座位号 (请填格式如: 10列8番)</th>
                     <th>状态</th>
                     <th>买家 (直接修改)</th>
-                    <th>价格 (直接修改)</th>
+                    <th>价格 (可改)</th>
                     <th>操作</th>
                     <th>历史</th>
                 </tr>
@@ -399,8 +400,12 @@
                 <option value="预定">标记为：预定</option>
                 <option value="已出">标记为：已出</option>
             </select>
+            <select id="set-currency">
+                <option value="CNY">¥人民币</option>
+                <option value="JPY">JP¥日元</option>
+            </select>
+            <input type="text" id="set-price" placeholder="金额(选填)" style="width:90px;">
             <input type="text" id="set-buyer" placeholder="买家(选填)" style="width:100px;">
-            <input type="text" id="set-price" placeholder="价格(选填)" style="width:80px;">
             <button onclick="saveSeatTicketsMulti()" class="btn-action">保存选中座位</button>
             <button onclick="deleteSeatTicketsMulti()" class="danger-btn" style="padding:6px 12px;">清除选中座位</button>
         </div>
@@ -421,6 +426,32 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    // ===== 价格工具（人民币 ¥ / 日元 JP¥，分开显示不换算） =====
+    // 存储格式："CNY:500" / "JPY:11000"；旧数据纯数字视为人民币
+    function parseTicketPrice(p) {
+        const s = String(p == null ? '' : p).trim();
+        if (!s) return null;
+        const m = s.match(/^(CNY|JPY)\s*[:：]\s*([\d.]+)$/i);
+        if (m) return { cur: m[1].toUpperCase(), amt: parseFloat(m[2]) };
+        const n = parseFloat(s);
+        return isNaN(n) ? null : { cur: 'CNY', amt: n };
+    }
+
+    function formatTicketPrice(p) {
+        const r = parseTicketPrice(p);
+        if (!r) return '';
+        if (!r.amt) return r.cur === 'JPY' ? 'JP¥0' : '¥0';
+        const num = Number.isInteger(r.amt) ? r.amt : r.amt.toFixed(2);
+        return r.cur === 'JPY' ? 'JP¥' + num : '¥' + num;
+    }
+
+    // 把币种+金额转成存储格式
+    function buildPriceStr(cur, amt) {
+        const a = String(amt == null ? '' : amt).trim();
+        if (!a) return '';
+        return (cur === 'JPY' ? 'JPY:' : 'CNY:') + a;
     }
 
     // 把一条记录的座位字段拆成座位数组（精确匹配用，避免 "5番" 误匹配 "15番"）
@@ -869,9 +900,25 @@
         return '';
     }
 
-    function ticketMoney(t) {
-        const p = parseFloat(t.price);
-        return isNaN(p) ? 0 : p;
+    function ticketMoney(t) { return 0; }
+
+    // 给某人的已出票合计应收（按币种分开）
+    function sumReceivable(list) {
+        let cny = 0, jpy = 0;
+        list.forEach(t => {
+            if (t.status !== '已出') return;
+            const r = parseTicketPrice(t.price);
+            if (!r) return;
+            if (r.cur === 'JPY') jpy += r.amt; else cny += r.amt;
+        });
+        return { cny, jpy };
+    }
+
+    function formatReceivable(m) {
+        const parts = [];
+        if (m.cny) parts.push('¥' + m.cny);
+        if (m.jpy) parts.push('JP¥' + m.jpy);
+        return parts.join(' + ') || '¥0';
     }
 
     function renderPool() {
@@ -884,11 +931,10 @@
             const op = operatorOf(t) || '未署名';
             if (!agg[op]) agg[op] = { inHand: 0, reserved: 0, sold: 0, tickets: [] };
             const n = getSingleTicketCount(t);
-            const money = ticketMoney(t);
             if (t.status === '在手') agg[op].inHand += n;
             else if (t.status === '预定') agg[op].reserved += n;
             else if (t.status === '已出') agg[op].sold += n;
-            agg[op].tickets.push({ t, n, money });
+            agg[op].tickets.push({ t, n });
         });
 
         // 固定顺序展示 5 个名字，没票也显示 0
@@ -897,6 +943,7 @@
         order.forEach(name => {
             const a = agg[name] || { inHand: 0, reserved: 0, sold: 0, tickets: [] };
             const total = a.inHand + a.reserved + a.sold;
+            const recv = sumReceivable(a.tickets.map(x => x.t));
             html += `
                 <div class="member-card" onclick="openMemberModal('${name}')">
                     <div class="m-name">${name}</div>
@@ -906,6 +953,7 @@
                         <span>🔴已出 <b>${a.sold}</b></span>
                     </div>
                     <div style="font-size:0.75rem; color:#888; margin-top:6px;">共 ${total} 张</div>
+                    <div style="font-size:0.75rem; color:#d63384; margin-top:3px;" title="已出票的应收合计">💰应收 ${formatReceivable(recv)}</div>
                 </div>`;
         });
         // 未署名的（老数据无 BY）也展示一下，避免"消失的票"
@@ -913,26 +961,28 @@
             if (order.includes(name)) return;
             const a = agg[name];
             const total = a.inHand + a.reserved + a.sold;
+            const recv = sumReceivable(a.tickets.map(x => x.t));
             html += `
                 <div class="member-card" style="opacity:0.85;" onclick="openMemberModal('${esc(name)}')">
                     <div class="m-name">${esc(name)}</div>
                     <div class="m-counts"><span style="color:#999;">共 ${total} 张（未署名）</span></div>
+                    <div style="font-size:0.75rem; color:#d63384; margin-top:3px;">💰应收 ${formatReceivable(recv)}</div>
                 </div>`;
         });
 
         poolGrid.innerHTML = html || '<div style="color:#999;">暂无任何票</div>';
 
         // 底部合计
-        let allTotal = 0, allMoney = 0, dom = 0, over = 0;
+        let allTotal = 0, dom = 0, over = 0;
+        const allRecv = sumReceivable(allTickets);
         allTickets.forEach(t => {
             const n = getSingleTicketCount(t);
             allTotal += n;
-            allMoney += ticketMoney(t);
             if (t.note && t.note.includes('本土票')) dom += n;
             if (t.note && t.note.includes('海外票')) over += n;
         });
         document.getElementById('pool-total-text').innerText = `全团合计：${allTickets.length} 组 / ${allTotal} 张　(本土 ${dom} · 海外 ${over})`;
-        document.getElementById('pool-total-money').innerText = `预计总金额 ¥${allMoney}`;
+        document.getElementById('pool-total-money').innerText = `全团应收(已出)：${formatReceivable(allRecv)}`;
     }
 
     // 成员明细弹窗
@@ -943,7 +993,9 @@
         if (mine.length === 0) {
             body.innerHTML = '<div style="color:#999;">该成员名下暂无票据</div>';
         } else {
-            body.innerHTML = '<table class="ticket-table"><thead><tr><th>票号</th><th>场馆</th><th>区域/座位</th><th>状态</th><th>买家</th><th>价格</th></tr></thead><tbody>' +
+            const recv = sumReceivable(mine);
+            body.innerHTML = `<div style="margin-bottom:8px; font-weight:bold; color:#d63384;">💰 应收(已出)合计：${formatReceivable(recv)}</div>` +
+            '<table class="ticket-table"><thead><tr><th>票号</th><th>场馆</th><th>区域/座位</th><th>状态</th><th>买家</th><th>价格</th></tr></thead><tbody>' +
                 mine.map(t => {
                     const block = parseBlockFromNote(t.note);
                     const loc = `${block && block !== 'UNASSIGNED' ? block + '区' : '待定'} ${t.seat || '待分配'}`;
@@ -954,7 +1006,7 @@
                         <td>${esc(loc)}</td>
                         <td>${statusIcon} ${esc(t.status)}</td>
                         <td>${esc(t.buyer || '')}</td>
-                        <td>${t.price ? '¥' + esc(t.price) : ''}</td>
+                        <td>${esc(formatTicketPrice(t.price))}</td>
                     </tr>`;
                 }).join('') + '</tbody></table>';
         }
@@ -1074,6 +1126,9 @@
         const curOwner = operatorOf(t) || '';
         if (orig === curOwner) { alert('这张票已经归还原主了。'); return; }
 
+        // 二次确认，防止误点退回
+        if (!confirm(`⬅️ 确定要把这张票退回给「${orig}」吗？\n\n${ticketDesc(t)}\n\n退回后此票将归回 ${orig} 名下。`)) return;
+
         // 把 BY 改回原主，并移除"原属"标记（已回到原主手里）
         let updatedNote = t.note || '';
         updatedNote = updatedNote.replace(/BY:[^\]]+/, `BY:${orig}`);
@@ -1102,7 +1157,6 @@
         let soldTickets = 0;
         let domesticTickets = 0;
         let overseasTickets = 0;
-        let totalPrice = 0;
 
         venueTickets.forEach(t => {
             const count = getSingleTicketCount(t);
@@ -1112,16 +1166,12 @@
 
             if (t.note && t.note.includes('本土票')) domesticTickets += count;
             if (t.note && t.note.includes('海外票')) overseasTickets += count;
-
-            const p = parseFloat(t.price);
-            if (!isNaN(p)) totalPrice += p;
         });
 
         document.getElementById('stat-in-hand').innerText = inHandTickets;
         document.getElementById('stat-reserved').innerText = reservedTickets;
         document.getElementById('stat-sold').innerText = soldTickets;
         document.getElementById('stat-source').innerText = `${domesticTickets} / ${overseasTickets}`;
-        document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
         renderTicketTable();
         renderPool();
@@ -1191,7 +1241,7 @@
         const blockKeys = getBlockKeys();
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="color:#999;">无符合条件数据</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">无符合条件数据</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map(t => {
                 let blockCode = 'UNASSIGNED';
@@ -1203,9 +1253,8 @@
                 const source = (t.note && t.note.includes('海外票')) ? '🌏 海外' : '🇯🇵 本土';
                 
                 let typeDisplay = `👤 单人`;
-                if (t.note && t.note.includes('4连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👨‍👩‍👧‍👦 4连</span>`;
-                else if (t.note && t.note.includes('3连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👨‍👦‍👦 3连</span>`;
-                else if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
+                if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
+                else if (t.note && (t.note.includes('3连番') || t.note.includes('4连番'))) typeDisplay = `<span style="color:#999;">旧数据多连</span>`;
 
                 const ticketNo = ticketNoMapById[t.id] || '票-';
                 const origOwner = originalOwnerOf(t);
@@ -1240,6 +1289,18 @@
                     </select>
                 `;
 
+                // 价格：币种 + 金额（直接改）
+                const pr = parseTicketPrice(t.price) || { cur: 'CNY', amt: null };
+                const priceHtml = `
+                    <span style="display:inline-flex; align-items:center; gap:2px;">
+                        <select class="table-select" style="padding:2px 2px; font-size:0.72rem;" onchange="updateTicketPrice('${t.id}', this.value, document.getElementById('price-amt-${t.id}').value)">
+                            <option value="CNY" ${pr.cur === 'CNY' ? 'selected' : ''}>¥</option>
+                            <option value="JPY" ${pr.cur === 'JPY' ? 'selected' : ''}>JP¥</option>
+                        </select>
+                        <input id="price-amt-${t.id}" type="text" class="table-input" style="width:64px;" value="${esc(pr.amt != null ? pr.amt : '')}" placeholder="金额" onchange="updateTicketPrice('${t.id}', this.previousElementSibling.value, this.value)">
+                    </span>
+                `;
+
                 return `
                     <tr>
                         <td><span class="ticket-no-badge">${esc(ticketNo)}</span>${transferBadge}</td>
@@ -1252,9 +1313,7 @@
                         <td>
                             <input type="text" class="table-input" value="${esc(t.buyer)}" placeholder="无" onchange="updateTicketField('${t.id}', 'buyer', this.value)">
                         </td>
-                        <td>
-                            <input type="text" class="table-input" value="${esc(t.price)}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
-                        </td>
+                        <td>${priceHtml}</td>
                         <td style="white-space:nowrap;">
                             ${actionHtml}
                         </td>
@@ -1264,6 +1323,25 @@
                     </tr>
                 `;
             }).join('');
+        }
+    }
+
+    // 更新价格（币种+金额组合）
+    async function updateTicketPrice(ticketId, currency, amt) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) { fetchTickets(); return; }
+
+        const target = findTicketById(ticketId);
+        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(target)) { fetchTickets(); return; }
+
+        const price = buildPriceStr(currency || 'CNY', String(amt || '').trim());
+        const { error } = await _supabase.from('tickets').update({ price: price }).eq('id', ticketId);
+        if (error) alert('价格更新失败：' + error.message);
+        else {
+            const t2 = findTicketById(ticketId);
+            await addLog('修改价格', `将 ${ticketDesc(t2 || target)} 价格改为: ${price ? formatTicketPrice(price) : '未填'}`, ticketId);
+            fetchTickets();
         }
     }
 
@@ -1363,7 +1441,8 @@
         const type = document.getElementById('quick-type').value;
         const status = document.getElementById('quick-status').value;
         const buyer = document.getElementById('quick-buyer').value.trim();
-        const price = document.getElementById('quick-price').value.trim();
+        const currency = document.getElementById('quick-currency').value;
+        const price = buildPriceStr(currency, document.getElementById('quick-price').value);
 
         if (seat !== '待分配' && block !== 'UNASSIGNED') {
             const existing = getTicket(currentVenue, block, seat);
@@ -1386,7 +1465,7 @@
         const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
         const blockLogStr = block !== 'UNASSIGNED' ? `${block}区` : '未确定Block';
-        await addLog('录入票据', `新增【${currentVenue} ${blockLogStr} ${seat}】 ${type} (${source}, ${status})`, newId);
+        await addLog('录入票据', `新增【${currentVenue} ${blockLogStr} ${seat}】 ${type} (${source}, ${status})` + (price ? ` 价格 ${formatTicketPrice(price)}` : ''), newId);
 
         document.getElementById('quick-buyer').value = '';
         document.getElementById('quick-price').value = '';
@@ -1427,6 +1506,11 @@
         selectedSeatsArray = [];
         document.getElementById('modal-title').innerText = `${currentVenue} - ${blockCode} 座位阵列`;
         const container = document.getElementById('seat-grid-container');
+        // 每次打开清空上次填写（状态/价格/买家）
+        document.getElementById('set-status').value = '在手';
+        document.getElementById('set-currency').value = 'CNY';
+        document.getElementById('set-price').value = '';
+        document.getElementById('set-buyer').value = '';
 
         if (currentVenue === '东京场') {
             const conf = TOKYO_CONFIG[blockCode] || { startCol: 1, endCol: 15, seats: 14 };
@@ -1508,7 +1592,7 @@
         if (existing) {
             // 已占座位可以选中（配合「清除选中座位」使用），但给出占用提示
             if (!el.classList.contains('selected')) {
-                alert(`📌 提示：座位【${seatStr}】已有记录！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n票价：${existing.price || '无'}\n\n如需删除请使用「清除选中座位」。`);
+                alert(`📌 提示：座位【${seatStr}】已有记录！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n价格：${formatTicketPrice(existing.price) || '未填'}\n\n如需删除请使用「清除选中座位」。`);
             }
             selectedSeatsArray.push(seatStr);
             el.classList.add('selected');
@@ -1523,10 +1607,16 @@
         const operator = getAuthenticatedOperator();
         if (!operator) return;
         if (selectedSeatsArray.length === 0) { alert('请先点击选中至少一个座位！'); return; }
+        if (selectedSeatsArray.length > 2) {
+            alert('⚠️ Magical Mirai 座位最多 2 连，请最多选 2 个座位（如需分开请分两次保存）。');
+            openSeatModal(currentBlock);
+            return;
+        }
 
         const status = document.getElementById('set-status').value;
         const buyer = document.getElementById('set-buyer').value.trim();
-        const price = document.getElementById('set-price').value.trim();
+        const currency = document.getElementById('set-currency').value;
+        const price = buildPriceStr(currency, document.getElementById('set-price').value);
 
         // 双重校验：已占座位不允许再次保存（防重复录入）
         const occupied = selectedSeatsArray.filter(s => getTicket(currentVenue, currentBlock, s));
@@ -1540,8 +1630,6 @@
         
         let typeStr = '单人票';
         if (selectedSeatsArray.length === 2) typeStr = '2连番';
-        else if (selectedSeatsArray.length === 3) typeStr = '3连番';
-        else if (selectedSeatsArray.length >= 4) typeStr = '4连番';
 
         const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
@@ -1554,7 +1642,7 @@
         if (error) { alert('保存失败：' + error.message); return; }
         const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
-        await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`, newId);
+        await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}` + (price ? ` 价格 ${formatTicketPrice(price)}` : ''), newId);
         
         document.getElementById('set-buyer').value = '';
         document.getElementById('set-price').value = '';
@@ -1620,7 +1708,7 @@
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
             }
-            txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) - ${t.price ? '¥'+t.price : '无价格'}\n`;
+            txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) ${t.price ? '[' + formatTicketPrice(t.price) + ']' : ''}\n`;
         });
 
         navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板！'))
@@ -1642,7 +1730,7 @@
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
             }
-            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', t.price || '', t.note || ''].map(csvCell).join(',') + '\n';
+            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', formatTicketPrice(t.price), t.note || ''].map(csvCell).join(',') + '\n';
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1662,7 +1750,7 @@
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
             }
-            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', t.price || '', t.note || ''].map(csvCell).join(',') + '\n';
+            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', formatTicketPrice(t.price), t.note || ''].map(csvCell).join(',') + '\n';
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
