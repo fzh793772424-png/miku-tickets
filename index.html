@@ -88,7 +88,7 @@
         <button class="tab-btn" id="btn-hiroshima" onclick="switchVenue('广岛场')">广岛场 (上野学园大厅)</button>
     </div>
 
-    <!-- 操作人与验证 -->
+    <!-- 操作人与密码校验 -->
     <div class="operator-bar">
         <div style="display:flex; gap:10px; align-items:center;">
             <span>👤 操作人：</span>
@@ -100,8 +100,8 @@
                 <option value="村民">村民</option>
                 <option value="X">X</option>
             </select>
-            <span>🔑 密码：</span>
-            <input type="password" id="operator-pass" placeholder="输入密码" style="width:100px;" onchange="saveOperatorSession()">
+            <span>🔑 个人密码：</span>
+            <input type="password" id="operator-pass" placeholder="输入个人密码" style="width:110px;" onchange="saveOperatorSession()">
         </div>
         <div>
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
@@ -122,13 +122,13 @@
 
     <!-- 表单录入 -->
     <div class="quick-add-card">
-        <strong style="font-size:1rem; color:#00796b;">✍️ 快捷票据录入：</strong>
+        <strong style="font-size:1rem; color:#00796b;">✍️ 票据录入 (也可直接点击下方地图打点录入)：</strong>
         <div class="form-row">
             <select id="quick-block" onchange="updateSeatDropdown()" style="font-weight:bold; color:#00796b;">
                 <option value="UNASSIGNED">❓ 待分配 / 未出票 (无具体Block)</option>
             </select>
-            <select id="quick-seat" style="max-width:200px;">
-                <option value="待分配">❓ 待出票 (具体座位未定)</option>
+            <select id="quick-seat" style="max-width:220px;" disabled>
+                <option value="待分配">🔒 无需选择 (待分配)</option>
             </select>
             <select id="quick-source">
                 <option value="本土票">日本本土票</option>
@@ -229,7 +229,17 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const USER_PASSWORDS = { '大瓜': '3939', '星黎': '1234', '薯饼': '4321', '村民': '3939', 'X': '6666' };
+    // 用户个人密码列表 (可自行扩展)
+    const USER_PASSWORDS = {
+        '大瓜': '3939',
+        '星黎': '3939',
+        '薯饼': '3939',
+        '村民': '3939',
+        'X': '3939'
+    };
+
+    // 二级清空高危密码
+    const CLEAR_SECONDARY_PASS = '3939';
 
     let currentVenue = '东京场';
     let allTickets = [];
@@ -304,13 +314,15 @@
         localStorage.setItem('miku_op_pass', document.getElementById('operator-pass').value);
     }
 
+    // 常规操作身份验证：用户名 + 个人密码
     function getAuthenticatedOperator() {
         const user = document.getElementById('operator-select').value;
         const pass = document.getElementById('operator-pass').value.trim();
 
-        if (!user) { alert('⚠️ 请先选择操作人！'); return null; }
-        if (USER_PASSWORDS[user] !== pass) {
-            alert(`❌ 密码错误！用户【${user}】的密码不匹配。`);
+        if (!user) { alert('⚠️ 请先选择操作人身份！'); return null; }
+        const correctPass = USER_PASSWORDS[user] || '3939';
+        if (pass !== correctPass) {
+            alert(`❌ 个人密码错误，请检查后再试！`);
             return null;
         }
         return user;
@@ -376,11 +388,13 @@
         const seatSelect = document.getElementById('quick-seat');
         
         if (block === 'UNASSIGNED' || !block) {
-            seatSelect.innerHTML = '<option value="待分配">❓ 待出票 (具体座位未定)</option>';
+            seatSelect.innerHTML = '<option value="待分配">🔒 无需选择 (待分配)</option>';
+            seatSelect.disabled = true;
             return;
         }
 
-        let seats = ['❓ 仅已知该 Block (座位待分配)'];
+        seatSelect.disabled = false;
+        let seats = ['❓ 仅已知 Block (座位待分配)'];
         if (currentVenue === '东京场') {
             const conf = TOKYO_CONFIG[block];
             if (conf) {
@@ -447,7 +461,6 @@
 
         renderTicketTable();
 
-        // 刷新地图样式与 Badge 计数
         document.querySelectorAll('.block-box').forEach(el => {
             el.classList.remove('bg-在手', 'bg-预定', 'bg-已出');
             const badge = el.querySelector('.block-badge');
@@ -466,7 +479,7 @@
 
             if (blockCode && blockCode !== 'UNASSIGNED') {
                 blockCounts[blockCode] = (blockCounts[blockCode] || 0) + 1;
-                blockStatusMap[blockCode] = t.status; // 记录状态高亮
+                blockStatusMap[blockCode] = t.status;
             }
         });
 
@@ -555,7 +568,7 @@
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待出票/分配" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
+                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待分配" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
                         </td>
                         <td>${statusSelectHtml}</td>
                         <td>
@@ -573,7 +586,6 @@
         }
     }
 
-    // 手打座位号时，自动提取 Block 名称（如打 "A2 1列1番" 自动设为 A2）
     async function updateTicketSeatAuto(ticketId, newSeatValue, oldNote) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
@@ -862,19 +874,24 @@
         link.click();
     }
 
+    // 仅清空操作触发高危二级密码验证
     async function clearCurrentVenueTickets() {
         const operator = getAuthenticatedOperator();
         if (!operator) return;
 
-        if (confirm(`‼️ 确认清空：即将彻底从数据库中删除【${currentVenue}】的所有票据记录，确定吗？`)) {
-            const { error } = await _supabase.from('tickets').delete().eq('show', currentVenue);
-            if (!error) {
-                await addLog('彻底清空', `清空了【${currentVenue}】的全量票据`);
-                alert(`✅ 【${currentVenue}】的所有票据已清空！`);
-                fetchTickets();
-            } else {
-                alert('清空失败：' + error.message);
-            }
+        const secPassInput = prompt(`⚠️ 高危警告：即将彻底清空【${currentVenue}】的全量数据！\n此操作不可撤销，请输入【二级清空专用密码】：`);
+        if (secPassInput !== CLEAR_SECONDARY_PASS) {
+            alert('❌ 二级清空密码验证失败，操作取消！');
+            return;
+        }
+
+        const { error } = await _supabase.from('tickets').delete().eq('show', currentVenue);
+        if (!error) {
+            await addLog('彻底清空', `清空了【${currentVenue}】的全量票据数据`);
+            alert(`✅ 【${currentVenue}】的所有票据已被彻底清空！`);
+            fetchTickets();
+        } else {
+            alert('清空失败：' + error.message);
         }
     }
 
