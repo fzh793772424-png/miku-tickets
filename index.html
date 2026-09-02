@@ -12,7 +12,7 @@
         
         header { background: #222; color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--miku); }
         
-        .tab-bar { display: flex; gap: 10px; margin: 15px 0; }
+        .tab-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
         .tab-btn { padding: 10px 20px; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .tab-btn.active { background: var(--miku); color: white; border-color: var(--miku); }
 
@@ -41,14 +41,14 @@
         .btn-action:hover { opacity: 0.9; }
         .danger-btn { background: #e71d36; color: white; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; cursor: pointer; }
 
-        .legend { display: flex; gap: 20px; justify-content: center; margin: 10px 0; font-size: 0.85rem; font-weight: bold; }
+        .legend { display: flex; gap: 20px; justify-content: center; margin: 10px 0; font-size: 0.85rem; font-weight: bold; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
         .dot { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
         
         .stage { background: #555; color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: 6px; margin-bottom: 15px; letter-spacing: 2px; }
         .map-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-x: auto; }
         
-        .block-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+        .block-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
         .block-box { border: 1px solid #dcdcdc; background: #fdfdfd; border-radius: 4px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; position: relative; }
         .block-box:hover { border-color: var(--miku); box-shadow: 0 3px 10px rgba(57,197,187,0.4); transform: translateY(-2px); }
         .block-title { font-weight: bold; font-size: 0.85rem; }
@@ -79,7 +79,7 @@
 <div class="container">
     <header>
         <h2>⚡ Magical Mirai 2026 精细座位交互看板</h2>
-        <span id="sync-status" style="font-size: 0.85rem; color:#39C5BB;">🟢 Supabase 已实时连接</span>
+        <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接 Supabase…</span>
     </header>
 
     <div class="tab-bar">
@@ -90,7 +90,7 @@
 
     <!-- 操作人与密码校验 -->
     <div class="operator-bar">
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <span>👤 操作人：</span>
             <select id="operator-select" onchange="saveOperatorSession()">
                 <option value="">-- 请选择身份 --</option>
@@ -103,7 +103,7 @@
             <span>🔑 个人密码：</span>
             <input type="password" id="operator-pass" placeholder="输入个人密码" style="width:110px;" onchange="saveOperatorSession()">
         </div>
-        <div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
             <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
             <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
@@ -231,6 +231,34 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // ===== 工具函数 =====
+    // HTML 转义：防止输入内容破坏页面结构或注入脚本
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 把一条记录的座位字段拆成座位数组（精确匹配用，避免 "5番" 误匹配 "15番"）
+    function seatListOf(t) {
+        if (!t || !t.seat) return [];
+        return String(t.seat).split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    function setSyncStatus(ok, text) {
+        const el = document.getElementById('sync-status');
+        if (ok) {
+            el.style.color = '#39C5BB';
+            el.innerText = text || '🟢 Supabase 已实时连接';
+        } else {
+            el.style.color = '#e71d36';
+            el.innerText = text || '🔴 Supabase 连接异常，请刷新重试';
+        }
+    }
+
     // 用户个人密码列表
     const USER_PASSWORDS = {
         '大瓜': '3939',
@@ -296,8 +324,10 @@
         fetchTickets();
         fetchLogs();
 
-        _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets()).subscribe();
-        _supabase.channel('logs').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs()).subscribe();
+        _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets())
+            .subscribe((status) => { if (status === 'SUBSCRIBED') setSyncStatus(true); else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setSyncStatus(false); });
+        _supabase.channel('logs').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs())
+            .subscribe((status) => { if (status !== 'SUBSCRIBED' && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) setSyncStatus(false); });
     }
 
     function switchVenue(venue) {
@@ -426,18 +456,22 @@
             }
         }
 
-        seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : s}">${s}</option>`).join('');
+        seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : esc(s)}">${esc(s)}</option>`).join('');
     }
 
     async function fetchTickets() {
-        const { data } = await _supabase
-            .from('tickets')
-            .select('*')
-            .order('created_at', { ascending: true });
-            
-        if (data) {
-            allTickets = data;
-            updateStatsAndHighlights();
+        try {
+            const { data, error } = await _supabase
+                .from('tickets')
+                .select('*')
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            if (data) {
+                allTickets = data;
+                updateStatsAndHighlights();
+            }
+        } catch (e) {
+            setSyncStatus(false, '🔴 票据数据加载失败，请检查网络或刷新');
         }
     }
 
@@ -447,12 +481,13 @@
             if (t.note.includes('3连')) return 3;
             if (t.note.includes('2连')) return 2;
         }
-        if (t.seat && t.seat !== '待分配') {
-            const arr = t.seat.split(',');
-            if (arr.length > 1) return arr.length;
-        }
+        const seats = seatListOf(t);
+        if (seats.length > 1) return seats.length;
         return 1;
     }
+
+    // 区块颜色优先级：已出 > 预定 > 在手（防止多条记录互相覆盖导致颜色随机）
+    const STATUS_PRIORITY = { '已出': 3, '预定': 2, '在手': 1 };
 
     function updateStatsAndHighlights() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
@@ -494,7 +529,7 @@
         });
 
         const blockCounts = {};
-        const blockStatusMap = {};
+        const blockBestStatus = {};
 
         venueTickets.forEach(t => {
             let blockCode = '';
@@ -506,13 +541,16 @@
             if (blockCode && blockCode !== 'UNASSIGNED') {
                 const count = getSingleTicketCount(t);
                 blockCounts[blockCode] = (blockCounts[blockCode] || 0) + count;
-                blockStatusMap[blockCode] = t.status;
+                const priority = STATUS_PRIORITY[t.status] || 0;
+                if (!blockBestStatus[blockCode] || priority > (STATUS_PRIORITY[blockBestStatus[blockCode]] || 0)) {
+                    blockBestStatus[blockCode] = t.status;
+                }
             }
         });
 
         Object.keys(blockCounts).forEach(code => {
             const el = document.getElementById(`block-${code}`);
-            if (el) el.classList.add(`bg-${blockStatusMap[code]}`);
+            if (el) el.classList.add(`bg-${blockBestStatus[code]}`);
 
             const badge = document.getElementById(`badge-${code}`);
             if (badge) {
@@ -584,7 +622,7 @@
                     .concat(blockKeys.map(k => `<option value="${k}" ${blockCode === k ? 'selected' : ''}>${k} Block</option>`))
                     .join('');
 
-                const blockSelectHtml = `<select class="table-select" onchange="updateTicketBlock('${t.id}', this.value, '${t.note || ''}')">${blockSelectOptions}</select>`;
+                const blockSelectHtml = `<select class="table-select" onchange="updateTicketBlock('${t.id}', this.value)">${blockSelectOptions}</select>`;
 
                 const statusSelectHtml = `
                     <select class="table-select" onchange="updateTicketField('${t.id}', 'status', this.value)">
@@ -596,18 +634,18 @@
 
                 return `
                     <tr>
-                        <td><span class="ticket-no-badge">${ticketNo}</span></td>
+                        <td><span class="ticket-no-badge">${esc(ticketNo)}</span></td>
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="如: 10列8番" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
+                            <input type="text" class="table-input" value="${esc(t.seat)}" placeholder="如: 10列8番" onchange="updateTicketSeatAuto('${t.id}', this.value)">
                         </td>
                         <td>${statusSelectHtml}</td>
                         <td>
-                            <input type="text" class="table-input" value="${t.buyer || ''}" placeholder="无" onchange="updateTicketField('${t.id}', 'buyer', this.value)">
+                            <input type="text" class="table-input" value="${esc(t.buyer)}" placeholder="无" onchange="updateTicketField('${t.id}', 'buyer', this.value)">
                         </td>
                         <td>
-                            <input type="text" class="table-input" value="${t.price || ''}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
+                            <input type="text" class="table-input" value="${esc(t.price)}" placeholder="无" onchange="updateTicketField('${t.id}', 'price', this.value)">
                         </td>
                         <td>
                             <button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>
@@ -618,16 +656,23 @@
         }
     }
 
-    async function updateTicketSeatAuto(ticketId, newSeatValue, oldNote) {
+    async function updateTicketSeatAuto(ticketId, newSeatValue) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
+
+        // 从本地已加载的数据中取当前记录，避免把用户输入拼进 HTML 属性
+        const target = allTickets.find(t => t.id === ticketId);
+        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        const oldNote = target.note || '';
 
         let updatedNote = oldNote;
         let detectedBlock = '';
         const blockKeys = getBlockKeys();
 
-        for (let k of blockKeys) {
-            if (newSeatValue.toUpperCase().startsWith(k)) {
+        // 按 key 长度降序匹配，避免 "A10" 被误判成 "A1"
+        const sortedKeys = [...blockKeys].sort((a, b) => b.length - a.length);
+        for (let k of sortedKeys) {
+            if (String(newSeatValue).trim().toUpperCase().startsWith(k.toUpperCase())) {
                 detectedBlock = k;
                 break;
             }
@@ -641,7 +686,7 @@
             }
         }
 
-        const { error } = await _supabase.from('tickets').update({ seat: newSeatValue.trim(), note: updatedNote }).eq('id', ticketId);
+        const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote }).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
         else {
             await addLog('修改座位', `修改票据 [${ticketId}] 座位为: ${newSeatValue}`);
@@ -649,9 +694,13 @@
         }
     }
 
-    async function updateTicketBlock(ticketId, newBlock, oldNote) {
+    async function updateTicketBlock(ticketId, newBlock) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
+
+        const target = allTickets.find(t => t.id === ticketId);
+        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        const oldNote = target.note || '';
 
         let updatedNote = oldNote;
         if (updatedNote.includes('BLOCK:')) {
@@ -673,7 +722,7 @@
         if (!operator) { fetchTickets(); return; }
 
         const updateData = {};
-        updateData[field] = value.trim();
+        updateData[field] = String(value).trim();
 
         const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
         if (error) alert('更新失败：' + error.message);
@@ -703,7 +752,7 @@
             }
         }
 
-        await _supabase.from('tickets').insert([{
+        const { error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: seat,
             status: status,
@@ -711,6 +760,7 @@
             price: price,
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]);
+        if (error) { alert('录入失败：' + error.message); return; }
 
         const blockLogStr = block !== 'UNASSIGNED' ? `${block}区` : '未确定Block';
         await addLog('录入票据', `新增【${currentVenue} ${blockLogStr} ${seat}】 ${type} (${source}, ${status})`);
@@ -720,7 +770,6 @@
         fetchTickets();
     }
 
-    // 已更新：携带位置信息的单条删除功能
     async function deleteSingleTicket(ticketId) {
         const operator = getAuthenticatedOperator();
         if (!operator) return;
@@ -739,9 +788,12 @@
         const locationText = `【${blockInfo} ${seatInfo}】`;
 
         if (confirm(`确定要删除 ${locationText} 的票据记录吗？`)) {
-            await _supabase.from('tickets').delete().eq('id', ticketId);
-            await addLog('删除票据', `删除票据 ${locationText} (ID: ${ticketId})`);
-            fetchTickets();
+            const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
+            if (error) alert('删除失败：' + error.message);
+            else {
+                await addLog('删除票据', `删除票据 ${locationText} (ID: ${ticketId})`);
+                fetchTickets();
+            }
         }
     }
 
@@ -812,24 +864,34 @@
         document.getElementById('seatModal').style.display = 'flex';
     }
 
+    // 精确匹配：一条记录里的座位拆开后逐个比对，杜绝 "5番" 误配 "15番"
     function getTicket(show, block, seatStr) {
-        return allTickets.find(t => t.show === show && t.seat && t.seat.includes(seatStr) && t.note && t.note.includes(`BLOCK:${block}`));
+        return allTickets.find(t => t.show === show && t.note && t.note.includes(`BLOCK:${block}`) && seatListOf(t).includes(seatStr));
     }
 
     function toggleSeatSelect(seatStr, el) {
-        const existing = getTicket(currentVenue, currentBlock, seatStr);
-        if (existing && !el.classList.contains('selected')) {
-            alert(`📌 提示：座位【${seatStr}】已被选中！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n票价：${existing.price || '无'}`);
-        }
-
         const index = selectedSeatsArray.indexOf(seatStr);
+
+        // 已选中的座位：点击取消选中（用于误选或清除操作）
         if (index > -1) {
             selectedSeatsArray.splice(index, 1);
             el.classList.remove('selected');
-        } else {
+            return;
+        }
+
+        const existing = getTicket(currentVenue, currentBlock, seatStr);
+        if (existing) {
+            // 已占座位可以选中（配合「清除选中座位」使用），但给出占用提示
+            if (!el.classList.contains('selected')) {
+                alert(`📌 提示：座位【${seatStr}】已有记录！\n状态：${existing.status}\n买家：${existing.buyer || '无'}\n票价：${existing.price || '无'}\n\n如需删除请使用「清除选中座位」。`);
+            }
             selectedSeatsArray.push(seatStr);
             el.classList.add('selected');
+            return;
         }
+
+        selectedSeatsArray.push(seatStr);
+        el.classList.add('selected');
     }
 
     async function saveSeatTicketsMulti() {
@@ -840,6 +902,15 @@
         const status = document.getElementById('set-status').value;
         const buyer = document.getElementById('set-buyer').value.trim();
         const price = document.getElementById('set-price').value.trim();
+
+        // 双重校验：已占座位不允许再次保存（防重复录入）
+        const occupied = selectedSeatsArray.filter(s => getTicket(currentVenue, currentBlock, s));
+        if (occupied.length > 0) {
+            alert(`⚠️ 以下座位已有记录，不能重复保存：\n${occupied.join('\n')}\n\n如需处理请先使用「清除选中座位」。`);
+            openSeatModal(currentBlock);
+            return;
+        }
+
         const combinedSeats = selectedSeatsArray.join(',');
         
         let typeStr = '单人票';
@@ -847,7 +918,7 @@
         else if (selectedSeatsArray.length === 3) typeStr = '3连番';
         else if (selectedSeatsArray.length >= 4) typeStr = '4连番';
 
-        await _supabase.from('tickets').insert([{
+        const { error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: combinedSeats,
             status: status,
@@ -855,9 +926,12 @@
             price: price,
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]);
+        if (error) { alert('保存失败：' + error.message); return; }
 
         await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}`);
         
+        document.getElementById('set-buyer').value = '';
+        document.getElementById('set-price').value = '';
         fetchTickets();
         openSeatModal(currentBlock);
     }
@@ -867,13 +941,23 @@
         if (!operator) return;
         if (selectedSeatsArray.length === 0) { alert('请先选中要清除的座位！'); return; }
 
-        for (let seatStr of selectedSeatsArray) {
+        // 找出当前选中的座位里真正有记录的，逐个删除
+        const toDelete = selectedSeatsArray.filter(s => !!getTicket(currentVenue, currentBlock, s));
+        if (toDelete.length === 0) {
+            alert('选中的座位没有已录入的记录，无需清除。');
+            return;
+        }
+
+        if (!confirm(`确定要清除以下 ${toDelete.length} 个座位的记录吗？\n${toDelete.join('\n')}`)) return;
+
+        for (let seatStr of toDelete) {
             const existing = getTicket(currentVenue, currentBlock, seatStr);
             if (existing) {
-                await _supabase.from('tickets').delete().eq('id', existing.id);
+                const { error } = await _supabase.from('tickets').delete().eq('id', existing.id);
+                if (error) { alert('清除失败：' + error.message); return; }
             }
         }
-        await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】的座位记录: ${selectedSeatsArray.join(',')}`);
+        await addLog('清除座位', `清除【${currentVenue} ${currentBlock}】的座位记录: ${toDelete.join(',')}`);
         fetchTickets();
         openSeatModal(currentBlock);
     }
@@ -909,7 +993,12 @@
             txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) - ${t.price ? '¥'+t.price : '无价格'}\n`;
         });
 
-        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板！'));
+        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板！'))
+            .catch(() => alert('❌ 复制失败，请手动选择文本复制。'));
+    }
+
+    function csvCell(v) {
+        return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
     }
 
     function exportToCSV() {
@@ -923,7 +1012,7 @@
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
             }
-            csv += `"${t.show}","${blockCode}","${t.seat || '待分配'}","${t.status}","${t.buyer || ''}","${t.price || ''}","${t.note || ''}"\n`;
+            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', t.price || '', t.note || ''].map(csvCell).join(',') + '\n';
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -943,31 +1032,42 @@
             return;
         }
 
+        if (!confirm(`⚠️⚠️ 最后确认：真的要清空【${currentVenue}】的全部 ${allTickets.filter(t => t.show === currentVenue).length} 条记录吗？`)) return;
+
         const { error } = await _supabase.from('tickets').delete().eq('show', currentVenue);
-        if (!error) {
-            await addLog('彻底清空', `清空了【${currentVenue}】的全量票据数据`);
-            alert(`✅ 【${currentVenue}】的所有票据已被彻底清空！`);
-            fetchTickets();
-        } else {
+        if (error) {
             alert('清空失败：' + error.message);
+            return;
         }
+        await addLog('彻底清空', `清空了【${currentVenue}】的全量票据数据`);
+        alert(`✅ 【${currentVenue}】的所有票据已被彻底清空！`);
+        fetchTickets();
     }
 
     async function addLog(action, detail) {
         const operator = document.getElementById('operator-select').value || '未知用户';
-        await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
+        try {
+            await _supabase.from('ticket_logs').insert([{ operator, action, detail }]);
+        } catch (e) {
+            // 日志写入失败不影响主流程，仅静默
+        }
     }
 
     async function fetchLogs() {
-        const { data } = await _supabase.from('ticket_logs').select('*').order('created_at', { ascending: false }).limit(20);
-        if (data) {
-            document.getElementById('log-list').innerHTML = data.map(l => `
-                <div style="padding:3px 0; border-bottom:1px solid #f0f0f0;">
-                    <span style="color:#888;">[${new Date(l.created_at).toLocaleTimeString('zh-CN')}]</span>
-                    <strong style="color:#00796b;">${l.operator}</strong> 
-                    <span>${l.action}</span>: ${l.detail}
-                </div>
-            `).join('');
+        try {
+            const { data, error } = await _supabase.from('ticket_logs').select('*').order('created_at', { ascending: false }).limit(20);
+            if (error) throw error;
+            if (data) {
+                document.getElementById('log-list').innerHTML = data.map(l => `
+                    <div style="padding:3px 0; border-bottom:1px solid #f0f0f0;">
+                        <span style="color:#888;">[${new Date(l.created_at).toLocaleTimeString('zh-CN')}]</span>
+                        <strong style="color:#00796b;">${esc(l.operator)}</strong> 
+                        <span>${esc(l.action)}</span>: ${esc(l.detail)}
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            document.getElementById('log-list').innerHTML = '<div style="color:#e71d36;">日志加载失败</div>';
         }
     }
 
