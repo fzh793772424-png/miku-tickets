@@ -323,12 +323,13 @@
                     <th>状态</th>
                     <th>买家 (直接修改)</th>
                     <th>价格 (可改)</th>
+                    <th>📝 备注 (点一下可写)</th>
                     <th>操作</th>
                     <th>历史</th>
                 </tr>
             </thead>
             <tbody id="ticket-list-body">
-                <tr><td colspan="9" style="color:#999;">暂无录入票据</td></tr>
+                <tr><td colspan="10" style="color:#999;">暂无录入票据</td></tr>
             </tbody>
         </table>
         </div>
@@ -891,11 +892,17 @@
         return false;
     }
 
-    // 数据每次刷新后重建：按"场馆+操作人"给每张票编友好号（大瓜-1、星黎-2…）
+    // 数据每次刷新后重建 id → 票号 映射：
+    // 优先用数据库固定的 ticket_no（永不变）；若某票还没有（旧数据未回填），临时兜底生成
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
         const counter = {};
         allTickets.forEach(t => {
+            if (t.ticket_no) {
+                ticketNoMapById[t.id] = t.ticket_no;
+                return;
+            }
+            // 兜底：没 ticket_no 的按旧逻辑临时编（跑过回填 SQL 后一般不会走到这）
             let op = '票';
             if (t.note && t.note.includes('BY:')) {
                 const m = t.note.match(/BY:([^\]]+)/);
@@ -905,6 +912,28 @@
             counter[key] = (counter[key] || 0) + 1;
             ticketNoMapById[t.id] = `${op}-${counter[key]}`;
         });
+    }
+
+    // ===== 分配下一个固定票号 =====
+    // 规则：操作人名下已有的最大序号 + 1，如 大瓜-7；永不重用（删掉的号也不再用）
+    async function nextTicketNo(op) {
+        const prefix = op || '票';
+        let max = 0;
+        try {
+            const { data } = await _supabase
+                .from('tickets')
+                .select('ticket_no')
+                .like('ticket_no', prefix + '-%');
+            (data || []).forEach(r => {
+                const s = String(r.ticket_no || '');
+                const m = s.match(new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-(\\d+)$'));
+                if (m) {
+                    const n = parseInt(m[1], 10);
+                    if (!isNaN(n) && n > max) max = n;
+                }
+            });
+        } catch (e) { /* 取号失败则从 1 开始 */ }
+        return prefix + '-' + (max + 1);
     }
 
     // 按 id 找票（兼容数字/字符串：数据库 id 是 bigint，页面传入的是字符串）
@@ -1320,7 +1349,7 @@
         const blockKeys = getBlockKeys();
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="color:#999;">无符合条件数据</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="color:#999;">无符合条件数据</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map(t => {
                 let blockCode = 'UNASSIGNED';
@@ -1380,6 +1409,15 @@
                     </span>
                 `;
 
+                // 备注（便利贴）：点击单元格直接编辑；悬停看全文
+                const memoText = t.memo || '';
+                const memoCell = `
+                    <td onclick="editTicketMemo('${t.id}')" title="${memoText ? esc(memoText) : '点击添加备注（如：已收定金 / 面交时间）'}"
+                        style="cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${memoText ? '#8a4a66' : '#bbb'}; font-size:0.78rem; border-radius:6px;">
+                        ${memoText ? '📌 ' + esc(memoText.length > 14 ? memoText.slice(0,14) + '…' : memoText) : '✎ 点此写备注'}
+                    </td>
+                `;
+
                 return `
                     <tr>
                         <td><span class="ticket-no-badge">${esc(ticketNo)}</span>${transferBadge}</td>
@@ -1393,6 +1431,7 @@
                             <input type="text" class="table-input" value="${esc(t.buyer)}" placeholder="无" onchange="updateTicketField('${t.id}', 'buyer', this.value)">
                         </td>
                         <td>${priceHtml}</td>
+                        ${memoCell}
                         <td style="white-space:nowrap;">
                             ${actionHtml}
                         </td>
@@ -1402,6 +1441,28 @@
                     </tr>
                 `;
             }).join('');
+        }
+    }
+
+    // 编辑备注（便利贴）
+    async function editTicketMemo(ticketId) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        const target = findTicketById(ticketId);
+        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(target)) return;
+
+        const cur = target.memo || '';
+        const val = prompt('📝 给这张票写备注（可留空清除）\n例如：已收定金300 / 7月15日梅田站面交', cur);
+        if (val === null) return;
+
+        const { error } = await _supabase.from('tickets').update({ memo: val.trim() }).eq('id', ticketId);
+        if (error) alert('备注保存失败：' + error.message);
+        else {
+            const t2 = findTicketById(ticketId);
+            await addLog('修改备注', `给 ${ticketDesc(t2 || target)} 写备注: ${val.trim() || '（清空）'}`, ticketId);
+            fetchTickets();
         }
     }
 
@@ -1565,6 +1626,9 @@
             }
         }
 
+        // 分配固定票号（如 大瓜-7，永不变）
+        const fixedNo = await nextTicketNo(operator);
+
         // 插入后取回新票 id（用于历史档案关联）；uniq_key 由云端唯一约束兜底防重复
         const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
@@ -1572,6 +1636,7 @@
             status: status,
             buyer: buyer,
             price: price,
+            ticket_no: fixedNo,
             uniq_key: seatDedupKey(currentVenue, block, seat),
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]).select('id');
@@ -1770,12 +1835,16 @@
         let typeStr = '单人票';
         if (selectedSeatsArray.length === 2) typeStr = '2连番';
 
+        // 分配固定票号
+        const fixedNo = await nextTicketNo(operator);
+
         const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: combinedSeats,
             status: status,
             buyer: buyer,
             price: price,
+            ticket_no: fixedNo,
             uniq_key: seatDedupKey(currentVenue, currentBlock, combinedSeats),
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]).select('id');
