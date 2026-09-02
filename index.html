@@ -454,6 +454,15 @@
         return (cur === 'JPY' ? 'JPY:' : 'CNY:') + a;
     }
 
+    // ===== 座位去重键（云端唯一约束用） =====
+    // 同场馆+区块+座位只允许一条；"待分配"不约束（一人可有多张待出票）
+    function seatDedupKey(show, block, seatStr) {
+        const s = String(seatStr == null ? '' : seatStr).trim();
+        if (!s || s === '待分配' || block === 'UNASSIGNED' || !block) return null;
+        const parts = s.split(',').map(x => x.trim()).filter(Boolean).sort();
+        return show + '|' + block + '|' + parts.join(',');
+    }
+
     // 默认票价（单张）：人民币 500 / 日元 11000（用户无需手输；可改）
     function defaultAmount(cur) {
         return cur === 'JPY' ? 11000 : 500;
@@ -825,7 +834,16 @@
             }
         }
 
-        seatSelect.innerHTML = seats.map((s, idx) => `<option value="${idx === 0 ? '待分配' : esc(s)}">${esc(s)}</option>`).join('');
+        // 已占用座位禁用显示（防重复录入的直观手段）
+        const optionHtml = seats.map((s, idx) => {
+            const seatVal = idx === 0 ? '待分配' : s;
+            const occupied = seatVal !== '待分配' ? getTicket(currentVenue, block, seatVal) : null;
+            const label = occupied
+                ? `🚫 ${s}（已被${esc(occupied.buyer || '某人')}占）`
+                : esc(s);
+            return `<option value="${esc(seatVal)}" ${occupied ? 'disabled' : ''}>${label}</option>`;
+        }).join('');
+        seatSelect.innerHTML = optionHtml;
     }
 
     // ===== 友好票号：日志显示"大瓜-1｜东京场 A5区 10列8番"，方便定位是哪张 =====
@@ -1413,8 +1431,13 @@
             }
         }
 
-        const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote }).eq('id', ticketId);
-        if (error) alert('更新失败：' + error.message);
+        const finalBlock = (updatedNote.match(/BLOCK:([^\]]+)/) || [])[1] || '';
+        const uniqKey = seatDedupKey(currentVenue, finalBlock, newSeatValue);
+        const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
+        if (error) {
+            if (/duplicate|uniq_key/i.test(error.message)) alert('⚠️ 这个座位已经有票了（可能别人刚改/录），请刷新看看！');
+            else alert('更新失败：' + error.message);
+        }
         else {
             const t2 = findTicketById(ticketId);
             await addLog('修改座位', `修改 ${ticketDesc(t2 || target)} → 座位改为: ${newSeatValue}`, ticketId);
@@ -1438,8 +1461,14 @@
             updatedNote = `[BLOCK:${newBlock}]` + updatedNote;
         }
 
-        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', ticketId);
-        if (error) alert('修改Block失败：' + error.message);
+        // 座位保持不变只换区块 → 去重键要重算（座位串取目标原座位）
+        const seatOfTicket = (target.seat || '').trim();
+        const uniqKey = seatDedupKey(currentVenue, newBlock, seatOfTicket);
+        const { error } = await _supabase.from('tickets').update({ note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
+        if (error) {
+            if (/duplicate|uniq_key/i.test(error.message)) alert('⚠️ 该区域+座位已经有票了（可能别人刚改），请刷新看看！');
+            else alert('修改Block失败：' + error.message);
+        }
         else {
             const t2 = findTicketById(ticketId);
             await addLog('修改区域', `将 ${ticketDesc(t2 || target)} 的区域调整为: ${newBlock}`, ticketId);
@@ -1491,16 +1520,27 @@
             }
         }
 
-        // 插入后取回新票 id（用于历史档案关联）
+        // 插入后取回新票 id（用于历史档案关联）；uniq_key 由云端唯一约束兜底防重复
         const { data: inserted, error } = await _supabase.from('tickets').insert([{
             show: currentVenue,
             seat: seat,
             status: status,
             buyer: buyer,
             price: price,
+            uniq_key: seatDedupKey(currentVenue, block, seat),
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]).select('id');
-        if (error) { alert('录入失败：' + error.message); return; }
+        if (error) {
+            if (/uniq_key|column .*uniq_key.* does not exist/i.test(error.message)) {
+                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请先在 Supabase SQL Editor 运行建列 SQL，再录入。');
+            } else if (/duplicate|uniq_key/i.test(error.message)) {
+                alert('⚠️ 这个位置的票已经存在了！请刷新页面看看（可能是别人刚录的）。');
+            } else {
+                alert('录入失败：' + error.message);
+            }
+            fetchTickets();
+            return;
+        }
         const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
         const blockLogStr = block !== 'UNASSIGNED' ? `${block}区` : '未确定Block';
@@ -1691,9 +1731,20 @@
             status: status,
             buyer: buyer,
             price: price,
+            uniq_key: seatDedupKey(currentVenue, currentBlock, combinedSeats),
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]).select('id');
-        if (error) { alert('保存失败：' + error.message); return; }
+        if (error) {
+            if (/uniq_key|column .*uniq_key.* does not exist/i.test(error.message)) {
+                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请先在 Supabase SQL Editor 运行建列 SQL，再保存。');
+            } else if (/duplicate|uniq_key/i.test(error.message)) {
+                alert('⚠️ 这些座位已经有票了（可能别人刚录）！请刷新后再看。');
+            } else {
+                alert('保存失败：' + error.message);
+            }
+            openSeatModal(currentBlock);
+            return;
+        }
         const newId = inserted && inserted[0] ? inserted[0].id : undefined;
 
         await addLog('打点录票', `打点录入【${currentVenue} ${currentBlock}】 座位: ${combinedSeats}` + (price ? ` 价格 ${formatTicketPrice(price)}` : ''), newId);
