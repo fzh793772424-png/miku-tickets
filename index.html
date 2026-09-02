@@ -319,7 +319,7 @@
                     <th>票据编号</th>
                     <th>区域 (Block 直接修改)</th>
                     <th>票源 / 类型</th>
-                    <th>座位号 (请填格式如: 10列8番)</th>
+                    <th>座位号 (单人: 10列8番 · 2连: 5列8番,5列9番，用英文逗号)</th>
                     <th>状态</th>
                     <th>买家 (直接修改)</th>
                     <th>价格 (可改)</th>
@@ -459,7 +459,7 @@
     function seatDedupKey(show, block, seatStr) {
         const s = String(seatStr == null ? '' : seatStr).trim();
         if (!s || s === '待分配' || block === 'UNASSIGNED' || !block) return null;
-        const parts = s.split(',').map(x => x.trim()).filter(Boolean).sort();
+        const parts = s.split(/[,，]/).map(x => x.trim()).filter(Boolean).sort();
         return show + '|' + block + '|' + parts.join(',');
     }
 
@@ -495,9 +495,17 @@
     }
 
     // 把一条记录的座位字段拆成座位数组（精确匹配用，避免 "5番" 误匹配 "15番"）
+    // 兼容中文逗号：用户可能误输 "，" 自动转成英文 ","
     function seatListOf(t) {
         if (!t || !t.seat) return [];
-        return String(t.seat).split(',').map(s => s.trim()).filter(Boolean);
+        return String(t.seat).split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    // 规范化座位串：统一用英文逗号分隔，去掉空格
+    function normalizeSeatText(s) {
+        return String(s == null ? '' : s)
+            .replace(/，/g, ',')          // 中文逗号 → 英文逗号
+            .split(',').map(x => x.trim()).filter(Boolean).join(',');
     }
 
     function setSyncStatus(ok, text) {
@@ -1378,7 +1386,7 @@
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <input type="text" class="table-input" value="${esc(t.seat)}" placeholder="如: 10列8番" onchange="updateTicketSeatAuto('${t.id}', this.value)">
+                            <input type="text" class="table-input" value="${esc(t.seat)}" placeholder="单人: 10列8番 / 2连: 5列8番,5列9番 (英文逗号)" onchange="updateTicketSeatAuto('${t.id}', this.value)">
                         </td>
                         <td>${statusSelectHtml}</td>
                         <td>
@@ -1422,6 +1430,10 @@
     async function updateTicketSeatAuto(ticketId, newSeatValue) {
         const operator = getAuthenticatedOperator();
         if (!operator) { fetchTickets(); return; }
+
+        // 规范化：中文逗号转英文逗号、去空格；2连示例 "5列8番,5列9番"
+        newSeatValue = normalizeSeatText(newSeatValue);
+        if (!newSeatValue) { alert('⚠️ 座位不能为空，请输入如: 10列8番'); fetchTickets(); return; }
 
         // 从本地已加载的数据中取当前记录，避免把用户输入拼进 HTML 属性
         const target = findTicketById(ticketId);
