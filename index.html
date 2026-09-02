@@ -110,13 +110,13 @@
         </div>
     </div>
 
-    <!-- 数据看板 -->
+    <!-- 数据看板 (修正：此处数字统计为真实【张数】，连票自动翻倍) -->
     <div class="stats-card">
         <div class="stat-box"><div>录入记录组数</div><div class="stat-num" id="stat-total">0</div></div>
-        <div class="stat-box"><div style="color:#1b9aaa;">在手</div><div class="stat-num" id="stat-in-hand" style="color:#2ec4b6;">0</div></div>
-        <div class="stat-box"><div style="color:#e58e00;">预定</div><div class="stat-num" id="stat-reserved" style="color:#ff9f1c;">0</div></div>
-        <div class="stat-box"><div style="color:#b80c21;">已出</div><div class="stat-num" id="stat-sold" style="color:#e71d36;">0</div></div>
-        <div class="stat-box"><div>本土 / 海外</div><div class="stat-num" id="stat-source" style="font-size:1.1rem; margin-top:8px;">0 / 0</div></div>
+        <div class="stat-box"><div style="color:#1b9aaa;">在手 (张数)</div><div class="stat-num" id="stat-in-hand" style="color:#2ec4b6;">0</div></div>
+        <div class="stat-box"><div style="color:#e58e00;">预定 (张数)</div><div class="stat-num" id="stat-reserved" style="color:#ff9f1c;">0</div></div>
+        <div class="stat-box"><div style="color:#b80c21;">已出 (张数)</div><div class="stat-num" id="stat-sold" style="color:#e71d36;">0</div></div>
+        <div class="stat-box"><div>本土 / 海外 (张数)</div><div class="stat-num" id="stat-source" style="font-size:1.1rem; margin-top:8px;">0 / 0</div></div>
         <div class="stat-box"><div>预计总金额</div><div class="stat-num" id="stat-money" style="color:#00796b;">¥0</div></div>
     </div>
 
@@ -137,6 +137,8 @@
             <select id="quick-type">
                 <option value="单人票">单人票</option>
                 <option value="2连番">2 连番</option>
+                <option value="3连番">3 连番</option>
+                <option value="4连番">4 连番</option>
             </select>
             <select id="quick-status">
                 <option value="在手">状态：在手</option>
@@ -170,7 +172,7 @@
                     <th>票据编号</th>
                     <th>区域 (Block 直接修改)</th>
                     <th>票源 / 类型</th>
-                    <th>座位号 (直接修改)</th>
+                    <th>座位号 (请填格式如: 10列8番)</th>
                     <th>状态</th>
                     <th>买家 (直接修改)</th>
                     <th>价格 (直接修改)</th>
@@ -229,7 +231,7 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hdGNreWh3emp3bWRhenBxemd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNjE5MjgsImV4cCI6MjEwMzgzNzkyOH0.cYWrlh_SwCkFXIJZt67xtK2HMotsqzhQzzQLAYYEg3g';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 用户个人密码列表 (可自行扩展)
+    // 用户个人密码列表
     const USER_PASSWORDS = {
         '大瓜': '3939',
         '星黎': '3939',
@@ -314,7 +316,6 @@
         localStorage.setItem('miku_op_pass', document.getElementById('operator-pass').value);
     }
 
-    // 常规操作身份验证：用户名 + 个人密码
     function getAuthenticatedOperator() {
         const user = document.getElementById('operator-select').value;
         const pass = document.getElementById('operator-pass').value.trim();
@@ -440,23 +441,51 @@
         }
     }
 
+    // 辅助函数：根据单条记录获取真实的【票数】（连票算对应张数）
+    function getSingleTicketCount(t) {
+        if (t.note) {
+            if (t.note.includes('4连')) return 4;
+            if (t.note.includes('3连')) return 3;
+            if (t.note.includes('2连')) return 2;
+        }
+        if (t.seat && t.seat !== '待分配') {
+            const arr = t.seat.split(',');
+            if (arr.length > 1) return arr.length;
+        }
+        return 1;
+    }
+
     function updateStatsAndHighlights() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
 
+        // 记录组数
         document.getElementById('stat-total').innerText = venueTickets.length;
-        document.getElementById('stat-in-hand').innerText = venueTickets.filter(t => t.status === '在手').length;
-        document.getElementById('stat-reserved').innerText = venueTickets.filter(t => t.status === '预定').length;
-        document.getElementById('stat-sold').innerText = venueTickets.filter(t => t.status === '已出').length;
-        
-        const domesticCount = venueTickets.filter(t => t.note && t.note.includes('本土票')).length;
-        const overseasCount = venueTickets.filter(t => t.note && t.note.includes('海外票')).length;
-        document.getElementById('stat-source').innerText = `${domesticCount} / ${overseasCount}`;
 
+        // 计算各类状态真实票数张数
+        let inHandTickets = 0;
+        let reservedTickets = 0;
+        let soldTickets = 0;
+        let domesticTickets = 0;
+        let overseasTickets = 0;
         let totalPrice = 0;
+
         venueTickets.forEach(t => {
+            const count = getSingleTicketCount(t);
+            if (t.status === '在手') inHandTickets += count;
+            if (t.status === '预定') reservedTickets += count;
+            if (t.status === '已出') soldTickets += count;
+
+            if (t.note && t.note.includes('本土票')) domesticTickets += count;
+            if (t.note && t.note.includes('海外票')) overseasTickets += count;
+
             const p = parseFloat(t.price);
             if (!isNaN(p)) totalPrice += p;
         });
+
+        document.getElementById('stat-in-hand').innerText = inHandTickets;
+        document.getElementById('stat-reserved').innerText = reservedTickets;
+        document.getElementById('stat-sold').innerText = soldTickets;
+        document.getElementById('stat-source').innerText = `${domesticTickets} / ${overseasTickets}`;
         document.getElementById('stat-money').innerText = `¥${totalPrice}`;
 
         renderTicketTable();
@@ -478,7 +507,8 @@
             }
 
             if (blockCode && blockCode !== 'UNASSIGNED') {
-                blockCounts[blockCode] = (blockCounts[blockCode] || 0) + 1;
+                const count = getSingleTicketCount(t);
+                blockCounts[blockCode] = (blockCounts[blockCode] || 0) + count;
                 blockStatusMap[blockCode] = t.status;
             }
         });
@@ -545,7 +575,12 @@
                 }
 
                 const source = (t.note && t.note.includes('海外票')) ? '🌏 海外' : '🇯🇵 本土';
-                const typeDisplay = (t.note && t.note.includes('2连番')) ? `<span style="color:#00796b; font-weight:bold;">👭 2连</span>` : `👤 单人`;
+                
+                let typeDisplay = `👤 单人`;
+                if (t.note && t.note.includes('4连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👨‍👩‍👧‍👦 4连</span>`;
+                else if (t.note && t.note.includes('3连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👨‍👦‍👦 3连</span>`;
+                else if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
+
                 const ticketNo = ticketNoMap[t.id] || '票-';
 
                 const blockSelectOptions = ['<option value="UNASSIGNED">❓ 待定Block</option>']
@@ -568,7 +603,7 @@
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
-                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="待分配" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
+                            <input type="text" class="table-input" value="${t.seat || ''}" placeholder="如: 10列8番" onchange="updateTicketSeatAuto('${t.id}', this.value, '${t.note || ''}')">
                         </td>
                         <td>${statusSelectHtml}</td>
                         <td>
@@ -795,7 +830,11 @@
         const buyer = document.getElementById('set-buyer').value.trim();
         const price = document.getElementById('set-price').value.trim();
         const combinedSeats = selectedSeatsArray.join(',');
-        const typeStr = selectedSeatsArray.length > 1 ? '2连番' : '单人票';
+        
+        let typeStr = '单人票';
+        if (selectedSeatsArray.length === 2) typeStr = '2连番';
+        else if (selectedSeatsArray.length === 3) typeStr = '3连番';
+        else if (selectedSeatsArray.length >= 4) typeStr = '4连番';
 
         await _supabase.from('tickets').insert([{
             show: currentVenue,
@@ -830,15 +869,24 @@
 
     function copyTextSummary() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
-        const inHand = venueTickets.filter(t => t.status === '在手').length;
-        const reserved = venueTickets.filter(t => t.status === '预定').length;
-        const sold = venueTickets.filter(t => t.status === '已出').length;
+        
+        let inHandCount = 0;
+        let reservedCount = 0;
+        let soldCount = 0;
+
+        venueTickets.forEach(t => {
+            const c = getSingleTicketCount(t);
+            if (t.status === '在手') inHandCount += c;
+            if (t.status === '预定') reservedCount += c;
+            if (t.status === '已出') soldCount += c;
+        });
+
         const unassigned = venueTickets.filter(t => !t.seat || t.seat.includes('待分配') || (t.note && t.note.includes('BLOCK:UNASSIGNED'))).length;
 
         let txt = `🎫 【Magical Mirai 2026 - ${currentVenue} 票据实时汇总】\n`;
         txt += `------------------------------------\n`;
-        txt += `📊 总记录数：${venueTickets.length} 组 | 待出票/待分配：${unassigned} 张\n`;
-        txt += `🟢 在手：${inHand} | 🟠 预定：${reserved} | 🔴 已出：${sold}\n\n`;
+        txt += `📊 总记录数：${venueTickets.length} 组 | 待出票/待分配：${unassigned} 组\n`;
+        txt += `🟢 在手：${inHandCount} 张 | 🟠 预定：${reservedCount} 张 | 🔴 已出：${soldCount} 张\n\n`;
         txt += `📋 明细列表：\n`;
 
         venueTickets.forEach((t, i) => {
@@ -874,7 +922,6 @@
         link.click();
     }
 
-    // 仅清空操作触发高危二级密码验证
     async function clearCurrentVenueTickets() {
         const operator = getAuthenticatedOperator();
         if (!operator) return;
