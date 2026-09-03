@@ -161,11 +161,20 @@
 <body>
 
 <div class="shell">
-    <!-- 左侧海报柱（1.JPG 竖版图） -->
+    <!-- 左侧海报柱（1.JPG 竖版图，点击可对话） -->
     <div class="poster-col">
-        <div class="poster-card">
+        <div class="poster-card" id="miku-poster" onclick="mikuTalk()" style="cursor:pointer;" title="点击和初音说话♪">
             <img src="1.JPG" alt="初音ミク">
-            <div class="poster-caption">✧ 初音ミク Magical Mirai 2027 ✧</div>
+            <div class="poster-caption">✧ 初音ミク Magical Mirai 2027 ✧<div style="font-size:0.7rem; color:#b3527f; margin-top:2px;">💬 点我说话</div></div>
+        </div>
+        <!-- 对话气泡（默认隐藏） -->
+        <div id="miku-bubble" style="display:none; position:relative; margin-top:10px; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.15); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.6;">
+            <div style="position:absolute; top:-7px; left:18px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid #fff;"></div>
+            <div id="miku-bubble-text">♪ 你好呀！</div>
+            <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:8px;">
+                <button onclick="mikuTalk()" style="border:1px solid #ffc2d9; background:#fff; color:#b3527f; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">再聊一句♪</button>
+                <button onclick="closeMikuBubble()" style="border:1px solid #ccc; background:#fff; color:#999; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">关闭</button>
+            </div>
         </div>
     </div>
 
@@ -2537,7 +2546,67 @@
 
     function closeModal() { document.getElementById('seatModal').style.display = 'none'; }
 
+    // ===== 💬 初音小对话（点海报说话） =====
+    const MIKU_LINES = [
+        '♪ 你好呀！今天也要加油整理票票哦～',
+        '🎵 小心别录重了位置哦，39 (Thank You)！',
+        '💚 票票有秩序，大家才开心！有需要就点成员卡片看看～',
+        '✨ Magical Mirai 2027，一起期待吧！',
+        '🎀 录完票记得检查状态哦：在手/预定/已出～',
+        '💤 辛苦啦，休息一下也 OK！'
+    ];
+    let mikuLineIdx = -1;
+    function mikuTalk() {
+        const bubble = document.getElementById('miku-bubble');
+        const text = document.getElementById('miku-bubble-text');
+        if (!bubble || !text) return;
+        mikuLineIdx = (mikuLineIdx + 1) % MIKU_LINES.length;
+        text.innerText = MIKU_LINES[mikuLineIdx];
+        bubble.style.display = 'block';
+    }
+    function closeMikuBubble() {
+        const bubble = document.getElementById('miku-bubble');
+        if (bubble) bubble.style.display = 'none';
+    }
+
     init();
+</script>
+
+<!-- 🎵 BGM 悬浮播放按钮 -->
+<audio id="bgm-audio" loop preload="none">
+    <source src="bgm.mp3" type="audio/mpeg">
+</audio>
+<button id="bgm-btn" title="播放/暂停背景音乐"
+    style="position:fixed; right:16px; bottom:16px; z-index:3000; width:52px; height:52px; border-radius:50%; border:none; cursor:pointer; font-size:1.4rem; background:linear-gradient(135deg,#39c5bb,#b388eb); color:#fff; box-shadow:0 4px 14px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center;">
+    🎵
+</button>
+
+<script>
+    // BGM 播放控制：默认暂停；点击切换播放/暂停，音量 30%，循环
+    (function () {
+        var audio = document.getElementById('bgm-audio');
+        var btn = document.getElementById('bgm-btn');
+        var playing = false;
+        if (audio) { audio.volume = 0.3; }
+
+        function toggleBgm() {
+            if (!audio) return;
+            if (playing) {
+                audio.pause();
+                btn.textContent = '🎵';
+                btn.style.background = 'linear-gradient(135deg,#39c5bb,#b388eb)';
+            } else {
+                audio.play().then(function () {
+                    playing = true;
+                    btn.textContent = '🎵';
+                    btn.style.background = 'linear-gradient(135deg,#ff8fb3,#ff5c9c)';
+                }).catch(function (e) {
+                    alert('无法播放音乐：' + (e && e.message ? e.message : '未知错误') + '\n（可能是音乐文件还没上传，或浏览器阻止了播放）');
+                });
+            }
+        }
+        if (btn) btn.addEventListener('click', toggleBgm);
+    })();
 </script>
 </body>
 </html>
