@@ -102,12 +102,18 @@
         .stage { background: linear-gradient(120deg,#a17fe0,#ff8fb3); color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: var(--radius); margin-bottom: 15px; letter-spacing: 2px; box-shadow: 0 3px 12px rgba(255,143,179,0.3); }
         .map-section { background: white; padding: 20px; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(255,143,179,0.12); overflow-x: auto; border: 1px solid #ffe9f1; }
         
-        .block-row { display: flex; gap: 8px; justify-content: flex-start; margin-bottom: 10px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 12px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 74px; min-height: 44px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position: relative; }
-        .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 4px 14px rgba(255,143,179,0.4); transform: translateY(-2px) rotate(-1deg); }
-        .block-title { font-weight: bold; font-size: 0.95rem; white-space: nowrap; }
+        .block-row { display: flex; gap: 5px; justify-content: flex-start; margin-bottom: 8px; flex-wrap: nowrap; }
+        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 8px; padding: 6px 2px; text-align: center; cursor: pointer; transition: all 0.15s; min-width: 46px; min-height: 30px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position: relative; }
+        .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 2px 10px rgba(255,143,179,0.4); }
+        .block-title { font-weight: bold; font-size: 0.8rem; white-space: nowrap; }
         
-        .block-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.72rem; border-radius: 10px; padding: 2px 7px; font-weight: bold; border: 1px solid white; }
+        .block-badge { position: absolute; top: -6px; right: -6px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.65rem; border-radius: 8px; padding: 1px 5px; font-weight: bold; border: 1px solid white; }
+
+        /* ===== 座位地图整体缩放 ===== */
+        .map-zoom-bar { display:flex; align-items:center; gap:8px; justify-content:center; margin: 4px 0 8px; font-size:0.8rem; color:#888; }
+        .map-zoom-bar button { width:30px; height:30px; border-radius:50%; border:1px solid #f0c9d8; background:#fff; font-size:1rem; cursor:pointer; font-weight:bold; color:#b3527f; }
+        .map-zoom-bar button:hover { background:#ffe3ee; }
+        #venue-layout-container { transform-origin: top center; transition: transform 0.2s; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
@@ -371,7 +377,15 @@
 
     <div class="map-section">
         <div class="stage">ステージ (STAGE 舞台)</div>
-        <div id="venue-layout-container"></div>
+        <div class="map-zoom-bar">
+            <button onclick="zoomMap(-0.1)" title="缩小">−</button>
+            <span id="map-zoom-label">100%</span>
+            <button onclick="zoomMap(0.1)" title="放大">＋</button>
+            <button onclick="zoomMap(0, true)" title="重置" style="width:auto; padding:0 10px; font-size:0.8rem;">重置</button>
+        </div>
+        <div id="venue-map-wrap" style="overflow-x:auto; overflow-y:hidden;">
+            <div id="venue-layout-container"></div>
+        </div>
     </div>
 
     <div class="log-box">
@@ -728,8 +742,8 @@
         'Z7': { startCol: 1, endCol: 48, startSeat: 67, endSeat: 78 },
         'Z8': { startCol: 3, endCol: 48, startSeat: 79, endSeat: 90 },
         'Z9': { startCol: 9, endCol: 48, startSeat: 91, endSeat: 96 },
-        'L-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37 },
-        'R-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37 }
+        'L-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, rowLetters: ['A列','B列','C列','D列','E列'] },
+        'R-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, rowLetters: ['A列','B列','C列','D列','E列'] }
     };
 
     function init() {
@@ -780,6 +794,23 @@
         return Object.keys(OSAKA_CONFIG);
     }
 
+    // ===== 地图缩放 =====
+    let mapZoom = 1;
+    function zoomMap(delta, reset) {
+        mapZoom = reset ? 1 : Math.min(1.6, Math.max(0.5, mapZoom + delta));
+        const wrap = document.getElementById('venue-map-wrap');
+        const cont = document.getElementById('venue-layout-container');
+        if (!wrap || !cont) return;
+        // 容器加 padding 让缩放后不贴边
+        wrap.style.overflow = 'auto';
+        cont.style.transform = `scale(${mapZoom})`;
+        cont.style.transformOrigin = 'top left';
+        // 让 wrap 高度适配缩放后的内容（scale 不占布局空间）
+        wrap.style.height = (cont.offsetHeight * mapZoom + 20) + 'px';
+        const lbl = document.getElementById('map-zoom-label');
+        if (lbl) lbl.innerText = Math.round(mapZoom * 100) + '%';
+    }
+
     function renderCurrentVenue() {
         const container = document.getElementById('venue-layout-container');
         if (currentVenue === '东京场') {
@@ -812,6 +843,14 @@
             html += '</div>';
             container.innerHTML = html;
         }
+        // 重置缩放
+        const resetZoomBtn = document.getElementById('map-zoom-label');
+        mapZoom = 1;
+        const contEl = document.getElementById('venue-layout-container');
+        const wrapEl = document.getElementById('venue-map-wrap');
+        if (contEl) contEl.style.transform = 'none';
+        if (wrapEl) wrapEl.style.height = 'auto';
+        if (resetZoomBtn) resetZoomBtn.innerText = '100%';
         populateBlockDropdown();
     }
 
@@ -829,50 +868,72 @@
         updateSeatDropdown();
     }
 
+    // ===== 🗺️ 座位规则表（配置化：以后改场地/改座位只改这里 + VENUE_CONFIGS）=====
+    // 座位命名/排版规则集中在每场馆的 config 里，渲染循环统一
+    // 每个 block 的 conf：
+    //   standing=站席: { seats:N }
+    //   普通席: { startCol, endCol, startSeat, endSeat, rowLetters? }
+    //   rowLetters 存在时列头用字母(A/B/C...)，否则用数字列
+    function makeSeatNames(venue, block, conf) {
+        const names = [];
+        if (conf.isStanding || conf.standing) {
+            for (let i = 1; i <= conf.seats; i++) names.push(`${i}番`);
+            return names;
+        }
+        // 每场馆命名习惯（可被 conf 覆盖）
+        const colUnit = conf.colUnit || (venue === '广岛场' ? '排' : '列');
+        const seatUnit = conf.seatUnit || (venue === '广岛场' ? '座' : '番');
+        const letters = conf.rowLetters || null;
+        const startSeat = conf.startSeat != null ? conf.startSeat : 1;
+        const endSeat = conf.endSeat != null ? conf.endSeat : conf.seats;
+        const colTotal = (conf.endCol - conf.startCol) + 1;
+        const seatTotal = (endSeat - startSeat) + 1;
+        for (let c = 0; c < colTotal; c++) {
+            const colNo = conf.startCol + c;
+            const colLabel = letters ? letters[c] : `${colNo}${colUnit}`;
+            for (let s = 0; s < seatTotal; s++) {
+                names.push(`${colLabel}${startSeat + s}${seatUnit}`);
+            }
+        }
+        return names;
+    }
+
+    // 座位弹窗网格：返回 [{colLabel, seatLabel, seat:[{name}]}] 结构数据（供渲染）
+    function makeSeatGrid(venue, block, conf) {
+        if (conf.isStanding || conf.standing) {
+            const items = [];
+            for (let i = 1; i <= conf.seats; i++) items.push({ name: `${i}番`, num: i });
+            return { standing: true, cols: [{ seat: items }] };
+        }
+        const colUnit = conf.colUnit || (venue === '广岛场' ? '排' : '列');
+        const seatUnit = conf.seatUnit || (venue === '广岛场' ? '座' : '番');
+        const letters = conf.rowLetters || null;
+        const startSeat = conf.startSeat != null ? conf.startSeat : 1;
+        const endSeat = conf.endSeat != null ? conf.endSeat : conf.seats;
+        const cols = [];
+        for (let colNo = conf.startCol; colNo <= conf.endCol; colNo++) {
+            const colLabel = letters ? letters[colNo - conf.startCol] : `${colNo}${colUnit}`;
+            const seat = [];
+            for (let s = startSeat; s <= endSeat; s++) seat.push({ name: `${colLabel}${s}${seatUnit}`, num: s });
+            cols.push({ colLabel, seat });
+        }
+        return { standing: false, cols };
+    }
+
+    // 快速录入：座位下拉列表（按座位规则生成 + 禁用已占）
     function updateSeatDropdown() {
         const block = document.getElementById('quick-block').value;
         const seatSelect = document.getElementById('quick-seat');
-        
-        if (block === 'UNASSIGNED' || !block) {
+        const venue = currentVenue;
+        const conf = getVenueConf(venue, block);
+        if (!conf) {
             seatSelect.innerHTML = '<option value="待分配">🔒 无需选择 (待分配)</option>';
             seatSelect.disabled = true;
             return;
         }
-
         seatSelect.disabled = false;
-        let seats = ['❓ 仅已知 Block (座位待分配)'];
-        if (currentVenue === '东京场') {
-            const conf = TOKYO_CONFIG[block];
-            if (conf) {
-                if (conf.isStanding) {
-                    for (let i = 1; i <= conf.seats; i++) seats.push(`${i}番`);
-                } else {
-                    for (let col = conf.startCol; col <= conf.endCol; col++) {
-                        for (let s = 1; s <= conf.seats; s++) seats.push(`${col}列${s}番`);
-                    }
-                }
-            }
-        } else if (currentVenue === '广岛场') {
-            const conf = HIROSHIMA_CONFIG[block];
-            if (conf) {
-                for (let col = conf.startCol; col <= conf.endCol; col++) {
-                    for (let s = conf.startSeat; s <= conf.endSeat; s++) seats.push(`${col}排${s}座`);
-                }
-            }
-        } else {
-            const conf = OSAKA_CONFIG[block];
-            if (conf) {
-                const is着席 = block.includes('着席');
-                const rowLabel = is着席 ? ['A','B','C','D','E'] : [];
-                for (let col = conf.startCol; col <= conf.endCol; col++) {
-                    const label = is着席 ? `${rowLabel[col-1]}列` : `${col}列`;
-                    for (let s = conf.startSeat; s <= conf.endSeat; s++) seats.push(`${label}${s}番`);
-                }
-            }
-        }
-
-        // 已占用座位禁用显示（防重复录入的直观手段）
-        const optionHtml = seats.map((s, idx) => {
+        const seats = makeSeatNames(venue, block, conf);
+        const optionHtml = ['❓ 仅已知 Block (座位待分配)'].concat(seats).map((s, idx) => {
             const seatVal = idx === 0 ? '待分配' : s;
             const occupied = seatVal !== '待分配' ? getTicket(currentVenue, block, seatVal) : null;
             const label = occupied
@@ -881,6 +942,14 @@
             return `<option value="${esc(seatVal)}" ${occupied ? 'disabled' : ''}>${label}</option>`;
         }).join('');
         seatSelect.innerHTML = optionHtml;
+    }
+
+    // 统一取场馆区块配置（配置化：要新增/改动区块去 getVenueConf + VENUE_CONFIGS）
+    function getVenueConf(venue, block) {
+        if (venue === '东京场') return TOKYO_CONFIG[block] || null;
+        if (venue === '广岛场') return HIROSHIMA_CONFIG[block] || null;
+        if (venue === '大阪场') return OSAKA_CONFIG[block] || null;
+        return null;
     }
 
     // ===== 友好票号：日志显示"大瓜-1｜东京场 A5区 10列8番"，方便定位是哪张 =====
@@ -2045,65 +2114,38 @@
         document.getElementById('set-price').removeAttribute('data-autoedited');
         document.getElementById('set-buyer').value = '';
 
-        if (currentVenue === '东京场') {
-            const conf = TOKYO_CONFIG[blockCode] || { startCol: 1, endCol: 15, seats: 14 };
-            if (conf.isStanding) {
-                container.style.gridTemplateColumns = 'repeat(10, 1fr)';
-                let html = '';
-                for(let i=1; i<=conf.seats; i++) {
-                    const seatStr = `${i}番`;
-                    const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${i}</div>`;
-                }
-                container.innerHTML = html;
-            } else {
-                container.style.gridTemplateColumns = `repeat(${conf.seats + 1}, auto)`;
-                let html = '';
-                for(let col = conf.startCol; col <= conf.endCol; col++) {
-                    html += `<div style="font-size:0.7rem; font-weight:bold; color:#888; line-height:28px;">${col}列</div>`;
-                    for(let seat = 1; seat <= conf.seats; seat++) {
-                        const seatStr = `${col}列${seat}番`;
-                        const ticket = getTicket(currentVenue, blockCode, seatStr);
-                        html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
-                    }
-                }
-                container.innerHTML = html;
-            }
-        } else if (currentVenue === '广岛场') {
-            const conf = HIROSHIMA_CONFIG[blockCode];
-            const totalSeats = conf.endSeat - conf.startSeat + 1;
-            container.style.gridTemplateColumns = `repeat(${totalSeats + 1}, auto)`;
-            let html = '';
-            for(let col = conf.startCol; col <= conf.endCol; col++) {
-                html += `<div style="font-size:0.7rem; font-weight:bold; color:#888; line-height:28px;">${col}排</div>`;
-                for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
-                    const seatStr = `${col}排${seat}座`;
-                    const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
-                }
-            }
-            container.innerHTML = html;
+        // 统一用"座位规则"渲染（不再按场馆写三套）
+        const conf = getVenueConf(currentVenue, blockCode) || { startCol: 1, endCol: 15, startSeat: 1, endSeat: 14 };
+        const grid = makeSeatGrid(currentVenue, blockCode, conf);
+        let html = '';
+        if (grid.standing) {
+            container.style.gridTemplateColumns = 'repeat(10, 1fr)';
+            grid.cols.forEach(col => {
+                col.seat.forEach(item => {
+                    const ticket = getTicket(currentVenue, blockCode, item.name);
+                    html += seatNodeHtml(item.name, ticket, item.num);
+                });
+            });
         } else {
-            const conf = OSAKA_CONFIG[blockCode];
-            const totalSeats = conf.endSeat - conf.startSeat + 1;
-            container.style.gridTemplateColumns = `repeat(${totalSeats + 1}, auto)`;
-            let html = '';
-            const is着席 = blockCode.includes('着席');
-            const rowLabel = is着席 ? ['A','B','C','D','E'] : [];
-
-            for(let col = conf.startCol; col <= conf.endCol; col++) {
-                const label = is着席 ? `${rowLabel[col-1]}列` : `${col}列`;
-                html += `<div style="font-size:0.7rem; font-weight:bold; color:#888; line-height:28px;">${label}</div>`;
-                for(let seat = conf.startSeat; seat <= conf.endSeat; seat++) {
-                    const seatStr = `${label}${seat}番`;
-                    const ticket = getTicket(currentVenue, blockCode, seatStr);
-                    html += `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${seatStr}', this)" title="${ticket ? ticketDesc(ticket) + (originalOwnerOf(ticket) ? '（转自' + originalOwnerOf(ticket) + '）' : '') : seatStr}">${seat}</div>`;
-                }
-            }
-            container.innerHTML = html;
+            // 列数 = 第一列座位数 + 1（列头）
+            const perCol = grid.cols.length ? grid.cols[0].seat.length : 1;
+            container.style.gridTemplateColumns = `repeat(${perCol + 1}, auto)`;
+            grid.cols.forEach(col => {
+                html += `<div style="font-size:0.7rem; font-weight:bold; color:#888; line-height:28px;">${esc(col.colLabel)}</div>`;
+                col.seat.forEach(item => {
+                    const ticket = getTicket(currentVenue, blockCode, item.name);
+                    html += seatNodeHtml(item.name, ticket, item.num);
+                });
+            });
         }
+        container.innerHTML = html;
 
         document.getElementById('seatModal').style.display = 'flex';
+    }
+
+    // 座位小格子 HTML（供 openSeatModal 统一调用）
+    function seatNodeHtml(seatStr, ticket, num) {
+        return `<div class="seat-node ${ticket ? 'bg-'+ticket.status : ''}${ticket && originalOwnerOf(ticket) ? ' transferred' : ''}" onclick="toggleSeatSelect('${esc(seatStr)}', this)" title="${ticket ? esc(ticketDesc(ticket)) + (originalOwnerOf(ticket) ? '（转自' + esc(originalOwnerOf(ticket)) + '）' : '') : esc(seatStr)}">${num}</div>`;
     }
 
     // 精确匹配：一条记录里的座位拆开后逐个比对，杜绝 "5番" 误配 "15番"
