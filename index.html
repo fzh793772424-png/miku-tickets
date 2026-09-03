@@ -20,8 +20,8 @@
 
         /* ===== 票据表格：手机可横向滑动 ===== */
         .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
-        .table-scroll .ticket-table { min-width: 1000px; }
-        .ticket-table td:first-child { min-width: 96px; white-space: nowrap; }
+        .table-scroll .ticket-table { min-width: 950px; }
+        .ticket-table td:first-child { min-width: 66px; white-space: nowrap; }
 
         /* ===== 手机适配 ===== */
         @media (max-width: 720px) {
@@ -42,6 +42,15 @@
             .seat-node { width: 24px; height: 24px; font-size: 0.6rem; }
             .pool-total { font-size: 0.8rem; }
             #btn-clear-all, .operator-bar .danger-btn { font-size: 0.8rem; }
+            /* 手机：场馆座位块保持大块，整排横向滑动（不换行挤压变小） */
+            .block-row { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+            .block-box { min-width: 76px; min-height: 46px; padding: 12px 8px; flex-shrink: 0; }
+            .block-title { font-size: 0.9rem; }
+            /* 手机：顶部成员卡片 & 票据池更紧凑 */
+            .member-card { padding: 8px 10px; }
+            .ticket-table th, .ticket-table td { padding: 5px 4px; font-size: 0.8rem; }
+            .ticket-no-badge { font-size: 0.72rem; padding: 2px 5px; }
+            .quick-add-card, .ticket-list-card, .operator-bar, .stats-card { padding: 10px; }
         }
 
         /* ===== 顶部横幅（1242x698 原图比例完整显示，不裁剪） ===== */
@@ -93,12 +102,12 @@
         .stage { background: linear-gradient(120deg,#a17fe0,#ff8fb3); color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: var(--radius); margin-bottom: 15px; letter-spacing: 2px; box-shadow: 0 3px 12px rgba(255,143,179,0.3); }
         .map-section { background: white; padding: 20px; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(255,143,179,0.12); overflow-x: auto; border: 1px solid #ffe9f1; }
         
-        .block-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
-        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 10px; padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 60px; position: relative; }
+        .block-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 12px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 74px; min-height: 44px; display:flex; align-items:center; justify-content:center; position: relative; }
         .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 4px 14px rgba(255,143,179,0.4); transform: translateY(-2px) rotate(-1deg); }
-        .block-title { font-weight: bold; font-size: 0.85rem; }
+        .block-title { font-weight: bold; font-size: 0.95rem; }
         
-        .block-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.7rem; border-radius: 10px; padding: 2px 6px; font-weight: bold; border: 1px solid white; }
+        .block-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.72rem; border-radius: 10px; padding: 2px 7px; font-weight: bold; border: 1px solid white; }
 
         .bg-在手 { background-color: #2ec4b6 !important; color: white; border-color: #1b9aaa; }
         .bg-预定 { background-color: #ff9f1c !important; color: white; border-color: #e58e00; }
@@ -118,7 +127,7 @@
         .log-box { background: white; padding: 15px; border-radius: var(--radius); margin-top: 15px; box-shadow: 0 2px 10px rgba(255,143,179,0.12); border: 1px solid #ffe9f1; }
         .log-list { max-height: 150px; overflow-y: auto; font-size: 0.8rem; background: #fffafc; padding: 8px; border: 1px solid #ffe9f1; border-radius: 8px; }
 
-        .ticket-no-badge { display:inline-block; white-space:nowrap; min-width:60px; background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 3px 8px; font-size: 0.78rem; }
+        .ticket-no-badge { display:inline-block; white-space:nowrap; background: linear-gradient(120deg,#333,#00897b); color: white; font-weight: bold; border-radius: 4px; padding: 2px 7px; font-size: 0.76rem; margin-right:1px; }
 
         /* ===== 团员票池 ===== */
         .pool-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-top: 4px solid var(--miku); }
