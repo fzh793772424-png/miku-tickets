@@ -342,14 +342,15 @@
         <div class="legend-item"><span class="dot bg-已出"></span> 已出票</div>
     </div>
 
-    <div style="text-align:center; font-size:0.78rem; color:#888; margin-bottom:8px;">
-        票号颜色：<span style="display:inline-block; width:10px; height:10px; background:#e965a3; border-radius:3px;"></span>大瓜(ルカ)　
-        <span style="display:inline-block; width:10px; height:10px; background:#f2c106; border-radius:3px;"></span>星黎(リン)　
-        <span style="display:inline-block; width:10px; height:10px; background:#e5484d; border-radius:3px;"></span>薯饼(MEIKO)　
-        <span style="display:inline-block; width:10px; height:10px; background:#f07c1f; border-radius:3px;"></span>村民(レン)　
+    <div style="text-align:center; font-size:0.78rem; color:#888; margin-bottom:4px;">
+        票号颜色：<span style="display:inline-block; width:10px; height:10px; background:#e965a3; border-radius:3px;"></span>瓜(ルカ)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f2c106; border-radius:3px;"></span>星(リン)　
+        <span style="display:inline-block; width:10px; height:10px; background:#e5484d; border-radius:3px;"></span>饼(MEIKO)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f07c1f; border-radius:3px;"></span>村(レン)　
         <span style="display:inline-block; width:10px; height:10px; background:#4a6fd4; border-radius:3px;"></span>X(KAITO)　
         <span style="display:inline-block; width:10px; height:10px; background:#2bb3a6; border-radius:3px;"></span>=子票(初音)
     </div>
+    <div style="text-align:center; font-size:0.82rem; font-weight:bold; color:#00796b; margin-bottom:8px;" id="mother-child-stat">母票/子票统计：加载中…</div>
 
     <div class="map-section">
         <div class="stage">ステージ (STAGE 舞台)</div>
@@ -903,21 +904,22 @@
     }
 
     // 数据每次刷新后重建 id → 票号 映射：
-    // 编号按【张】分配并跟随当前主人(BY)：同场馆内每人连续编号
-    // 2连票 = 两张 → 占两个号，显示如 大瓜-1,2；单人 → 大瓜-3
+    // 编号按【张】分配并跟随当前主人(BY)：同场馆内每人连续编号，用短名
+    // 2连票 = 两张 → 占两个号，显示如 瓜-1,2；单人 → 瓜-3
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
         const counter = {};
         // 遍历顺序稳定（fetch 已按 created_at 升序）
         allTickets.forEach(t => {
             const owner = operatorOf(t) || '未署名';
+            const short = shortName(owner);
             const key = (t.show || '?') + '|' + owner;
             const startNo = (counter[key] || 0) + 1;
             const piece = getSingleTicketCount(t) || 1;   // 2连=2 → 占2个号
             counter[key] = startNo + piece - 1;
             const nums = [];
             for (let i = startNo; i < startNo + piece; i++) nums.push(i);
-            ticketNoMapById[t.id] = nums.length > 1 ? `${owner}-${nums.join(',')}` : `${owner}-${startNo}`;
+            ticketNoMapById[t.id] = nums.length > 1 ? `${short}-${nums.join(',')}` : `${short}-${startNo}`;
         });
     }
 
@@ -1026,6 +1028,10 @@
     const COLOR_MIKU = '#2bb3a6'; // 子票色（初音青绿深一些保证白字可读）
     function memberColor(name) { return MEMBER_COLORS[name] || '#607d8b'; }
 
+    // 简称（票号用短名）：大瓜→瓜 星黎→星 薯饼→饼 村民→村 X→X
+    const MEMBER_SHORT = { '大瓜': '瓜', '星黎': '星', '薯饼': '饼', '村民': '村', 'X': 'X' };
+    function shortName(full) { return MEMBER_SHORT[full] || full; }
+
     // 生成彩色票号 HTML：
     // 单人票 → 母票色（成员色）一个号
     // 2连票 → 前半母票用成员色，后半子票用初音色
@@ -1039,15 +1045,27 @@
         const nums = numPart ? numPart.split(',').map(s => s.trim()).filter(Boolean) : [];
         const label = prefix.replace(/-$/, '');
         const n = getSingleTicketCount(t) || 1;
+        const isChild = (t.note || '').includes('子票');
         if (nums.length <= 1) {
-            // 单人：成员色
-            return `<span class="ticket-no-badge" style="background:${cOwner};">${esc(label)}</span>`;
+            // 单人：成员色；拆分出的子票用初音色
+            const bg = isChild ? COLOR_MIKU : cOwner;
+            return `<span class="ticket-no-badge" style="background:${bg};">${esc(label)}</span>`;
         }
         // 2连/多座：母(第一段=成员色) + 子(后续=初音色)
         const pieces = nums.map((num, idx) =>
             `<span class="ticket-no-badge" style="background:${idx === 0 ? cOwner : COLOR_MIKU};">${esc(label + '-' + num)}</span>`
         );
         return `<span style="white-space:nowrap;">${pieces.join(' ')}</span>`;
+    }
+
+    // ===== 拆分/合并同组标记 =====
+    // 拆分时给母/子各自 note 加 [GRP:xx]，合并时靠它找另一半
+    function grpOf(t) {
+        if (t && t.note) {
+            const m = t.note.match(/GRP:([A-Za-z0-9]+)/);
+            if (m) return m[1];
+        }
+        return '';
     }
 
     // 从票的 note 里取操作人（BY:xxx）= 当前管理人
@@ -1146,6 +1164,9 @@
         // 底部合计（全团应收 = 所有已出票，总额不变）
         const allRecv = sumReceivable(allTickets.filter(t => t.status === '已出'));
         const allTotal = allTickets.reduce((a, t) => a + getSingleTicketCount(t), 0);
+        // 母/子票数：单张=1母；2连=1母+1子 → 母票数=记录数，子票数=总张数-记录数
+        const mothers = allTickets.length;
+        const children = allTotal - mothers;
         let dom = 0, over = 0;
         allTickets.forEach(t => {
             const n = getSingleTicketCount(t);
@@ -1154,6 +1175,8 @@
         });
         document.getElementById('pool-total-text').innerText = `全团合计：${allTickets.length} 组 / ${allTotal} 张　(本土 ${dom} · 海外 ${over})`;
         document.getElementById('pool-total-money').innerText = `全团应收(已出)：${formatReceivable(allRecv)}`;
+        const mcEl = document.getElementById('mother-child-stat');
+        if (mcEl) mcEl.innerText = `🎟 母票 ${mothers} 张　·　💚 子票 ${children} 张`;
     }
 
     // 成员明细弹窗：显示 当前名下的票与应收 + 转入来自谁/转出给谁
@@ -1344,6 +1367,117 @@
 
     function closeTransferModal() { document.getElementById('transferModal').style.display = 'none'; }
 
+    // ===== ✂️ 拆分：把 2连票拆成 母/子 两条独立单张票 =====
+    async function splitTicket(ticketId) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        const t = findTicketById(ticketId);
+        if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(t)) return;
+
+        const seats = seatListOf(t);
+        if (seats.length < 2) { alert('这张票只有一个座位，无需拆分。'); return; }
+        if (seats.length > 2) { alert('⚠️ 目前仅支持拆 2连票（两个座位）。'); return; }
+        if (grpOf(t)) { alert('这张票已经是拆分过的单张，请用「合并」或先合并回 2连。'); return; }
+
+        const basePrice = parseTicketPrice(t.price);
+        if (!confirm(`✂️ 确认拆分这张 2连票吗？\n\n${ticketDesc(t)}\n\n拆分后将成为两张独立单张票，价格自动对半：\n${basePrice ? '原价 ' + formatTicketPrice(t.price) + ' → 每张 ' + formatTicketPrice(buildPriceStr(basePrice.cur, (basePrice.amt / 2))) : '（无价格）'}\n\n各自可单独转出/标记/填买家。`)) return;
+
+        const grp = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const seatA = seats[0], seatB = seats[1];
+
+        // 价格对半
+        let priceA = '', priceB = '';
+        if (basePrice) {
+            const half = Math.floor(basePrice.amt / 2);
+            priceA = buildPriceStr(basePrice.cur, half);
+            priceB = buildPriceStr(basePrice.cur, basePrice.amt - half);
+        }
+
+        // note：去掉"X连番"字样（否则拆后单张会被误算为连票），母/子加标签
+        const stripLink = (t.note || '').replace(/\[\d连番\]/g, '');
+        const noteA = stripLink + `[母票][GRP:${grp}]`;
+        const noteB = stripLink + `[子票][GRP:${grp}]`;
+
+        const { error: e1 } = await _supabase.from('tickets')
+            .update({ seat: seatA, price: priceA, note: noteA, uniq_key: seatDedupKey(currentVenue, parseBlockFromNote(t.note), seatA) })
+            .eq('id', t.id);
+        if (e1) { alert('拆分失败（更新母票）：' + e1.message); return; }
+
+        const { data: inserted, error: e2 } = await _supabase.from('tickets').insert([{
+            show: t.show,
+            seat: seatB,
+            status: t.status,
+            buyer: t.buyer,
+            price: priceB,
+            uniq_key: seatDedupKey(t.show, parseBlockFromNote(t.note), seatB),
+            memo: t.memo || '',
+            note: noteB
+        }]).select('id');
+        if (e2) { alert('拆分失败（创建子票）：' + e2.message); return; }
+
+        const childId = inserted && inserted[0] ? inserted[0].id : undefined;
+        await addLog('拆分票', `拆分 2连 ${ticketDesc(t)} → 母 ${seatA} / 子 ${seatB}（价格各半）`, t.id);
+        await addLog('拆分票', `生成子票 ${seatB}（同组 ${grp}）`, childId);
+        alert('✅ 已拆分成母票 + 子票两张独立票，可各自操作！');
+        fetchTickets();
+    }
+
+    // ===== 🔗 合并：把同组的母/子两张单张票合并回一条 2连 =====
+    async function mergeTicket(ticketId) {
+        const operator = getAuthenticatedOperator();
+        if (!operator) return;
+
+        const t = findTicketById(ticketId);
+        if (!t) { alert('未找到该票据记录，请刷新后重试'); return; }
+        if (!assertCanManage(t)) return;
+
+        const grp = grpOf(t);
+        if (!grp) { alert('这张票没有可合并的同伴（不是拆分出来的）。'); return; }
+
+        // 找同组的另一半
+        const mate = allTickets.find(x => String(x.id) !== String(t.id) && grpOf(x) === grp);
+        if (!mate) { alert('没找到同组的另一半（可能已被删除或转走）。'); return; }
+        if (!assertCanManage(mate)) { alert('同组的另一半不在你可管理范围（可能已转给他人）。'); return; }
+
+        const seatsA = seatListOf(t), seatsB = seatListOf(mate);
+        const allSeats = [...seatsA, ...seatsB];
+        if (allSeats.length > 2) { alert('这两张合并会超过 2 连，请检查数据。'); return; }
+        const combinedSeat = allSeats.join(',');
+
+        // 价格相加
+        const p1 = parseTicketPrice(t.price), p2 = parseTicketPrice(mate.price);
+        let combinedPrice = '';
+        if (p1 && p2 && p1.cur === p2.cur) combinedPrice = buildPriceStr(p1.cur, p1.amt + p2.amt);
+
+        if (!confirm(`🔗 确认把这两张合并回 2连吗？\n\n${ticketDesc(t)}\n＋\n${ticketDesc(mate)}\n\n合并后座位 ${combinedSeat}${combinedPrice ? '，价格 ' + formatTicketPrice(combinedPrice) : ''}`)) return;
+
+        // 保留较早的一张为主票，另一张删除
+        const keep = new Date(t.created_at) <= new Date(mate.created_at) ? t : mate;
+        const drop = keep === t ? mate : t;
+
+        const noteKeep = (keep.note || '')
+            .replace(/\[GRP:[A-Za-z0-9]+\]/g, '')
+            .replace(/\[母票\]/g, '')
+            .replace(/\[子票\]/g, '');
+        // 恢复 2连 标记（如果原来没有则补上，让显示/计数正确）
+        const finalNote = noteKeep.includes('2连番') ? noteKeep : noteKeep + '[2连番]';
+        const noteDrop = (drop.note || '').replace(/\[GRP:[A-Za-z0-9]+\]/g, '');
+
+        const { error: e1 } = await _supabase.from('tickets')
+            .update({ seat: combinedSeat, price: combinedPrice, note: finalNote, uniq_key: seatDedupKey(keep.show, parseBlockFromNote(keep.note), combinedSeat) })
+            .eq('id', keep.id);
+        if (e1) { alert('合并失败（更新主票）：' + e1.message); return; }
+
+        const { error: e2 } = await _supabase.from('tickets').delete().eq('id', drop.id);
+        if (e2) { alert('合并失败（删除重复票）：' + e2.message); return; }
+
+        await addLog('合并票', `合并回 2连：${combinedSeat}`, keep.id);
+        alert('✅ 已合并回一张 2连票！');
+        fetchTickets();
+    }
+
     // 区块颜色优先级：已出 > 预定 > 在手（防止多条记录互相覆盖导致颜色随机）
     const STATUS_PRIORITY = { '已出': 3, '预定': 2, '在手': 1 };
 
@@ -1464,11 +1598,20 @@
 
                 // 操作按钮按权限显示：非本人且非管理员名下的票，不显示可改按钮
                 const canM = canManageTicket(t);
+                const seatCount = seatListOf(t).length;
+                const isSplit = !!grpOf(t);
                 const actionBtns = [];
                 if (canM) {
                     actionBtns.push(`<button onclick="openTransferModal('${t.id}')" style="font-size:0.75rem; background:#00897b; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;">↔️ 转</button>`);
                     if (origOwner && origOwner !== ownerName) {
                         actionBtns.push(`<button onclick="returnTicket('${t.id}')" style="font-size:0.75rem; background:#b388eb; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="退回给原主 ${esc(origOwner)}">⬅️ 退回</button>`);
+                    }
+                    // 2连/多座 → 拆分；拆出来的单张（带组号）→ 合并
+                    if (seatCount >= 2 && !isSplit) {
+                        actionBtns.push(`<button onclick="splitTicket('${t.id}')" style="font-size:0.75rem; background:#ff8fb3; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="拆成母票+子票，可分别操作">✂️ 拆</button>`);
+                    }
+                    if (seatCount === 1 && isSplit) {
+                        actionBtns.push(`<button onclick="mergeTicket('${t.id}')" style="font-size:0.75rem; background:#9b8cff; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="与同组另一张合并回 2连">🔗 合</button>`);
                     }
                     actionBtns.push(`<button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>`);
                 } else {
