@@ -293,7 +293,7 @@
                 <option value="本土票">日本本土票</option>
                 <option value="海外票">海外先行票</option>
             </select>
-            <select id="quick-type" onchange="updateCurrencyDisplay()">
+            <select id="quick-type" onchange="updateCurrencyDisplay(); updateSeatDropdown();">
                 <option value="单人票">单人票</option>
                 <option value="2连番">2 连番</option>
             </select>
@@ -952,9 +952,12 @@
     }
 
     // 快速录入：座位下拉列表（按座位规则生成 + 禁用已占）
+    // 类型=2连番 时，下拉直接提供"相邻座位对"（同列连续番号/座号）
     function updateSeatDropdown() {
         const block = document.getElementById('quick-block').value;
         const seatSelect = document.getElementById('quick-seat');
+        const typeSel = document.getElementById('quick-type');
+        const is2 = typeSel && typeSel.value === '2连番';
         const venue = currentVenue;
         const conf = getVenueConf(venue, block);
         if (!conf) {
@@ -964,15 +967,44 @@
         }
         seatSelect.disabled = false;
         const seats = makeSeatNames(venue, block, conf);
-        const optionHtml = ['❓ 仅已知 Block (座位待分配)'].concat(seats).map((s, idx) => {
-            const seatVal = idx === 0 ? '待分配' : s;
-            const occupied = seatVal !== '待分配' ? getTicket(currentVenue, block, seatVal) : null;
-            const label = occupied
-                ? `🚫 ${s}（已被${esc(occupied.buyer || '某人')}占）`
-                : esc(s);
-            return `<option value="${esc(seatVal)}" ${occupied ? 'disabled' : ''}>${label}</option>`;
-        }).join('');
-        seatSelect.innerHTML = optionHtml;
+
+        if (!is2) {
+            // 单人：逐座选项
+            const optionHtml = ['❓ 仅已知 Block (座位待分配)'].concat(seats).map((s, idx) => {
+                const seatVal = idx === 0 ? '待分配' : s;
+                const occupied = seatVal !== '待分配' ? getTicket(currentVenue, block, seatVal) : null;
+                const label = occupied ? `🚫 ${s}（已占）` : esc(s);
+                return `<option value="${esc(seatVal)}" ${occupied ? 'disabled' : ''}>${label}</option>`;
+            }).join('');
+            seatSelect.innerHTML = optionHtml;
+            return;
+        }
+
+        // 2连：提供相邻对（同列内相邻番号，站席连续番号）
+        const pairs = [];
+        for (let i = 0; i < seats.length - 1; i++) {
+            if (isAdjacentSeat(seats[i], seats[i + 1])) {
+                const a = seats[i], b = seats[i + 1];
+                const aOcc = getTicket(currentVenue, block, a);
+                const bOcc = getTicket(currentVenue, block, b);
+                if (!aOcc && !bOcc) pairs.push(`${a},${b}`);
+            }
+        }
+        if (pairs.length === 0) {
+            seatSelect.innerHTML = '<option value="待分配">🔒 该区块没有可用的相邻 2连座位</option>';
+            return;
+        }
+        seatSelect.innerHTML = '<option value="">-- 选择相邻两座 --</option>' +
+            pairs.map(p => `<option value="${esc(p)}">${esc(p.replace(',', ' + '))}</option>`).join('');
+    }
+
+    // 判断两个座位名是否"相邻"（同一列前缀 + 连续番号/座号）
+    function isAdjacentSeat(s1, s2) {
+        const r = /^(.*?)(\d+)(番|座)$/;
+        const m1 = r.exec(s1), m2 = r.exec(s2);
+        if (!m1 || !m2) return false;
+        if (m1[1] !== m2[1] || m1[3] !== m2[3]) return false;
+        return Math.abs(parseInt(m1[2], 10) - parseInt(m2[2], 10)) === 1;
     }
 
     // 统一取场馆区块配置（配置化：要新增/改动区块去 getVenueConf + VENUE_CONFIGS）
