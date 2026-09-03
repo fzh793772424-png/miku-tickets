@@ -1046,10 +1046,12 @@
         const label = prefix.replace(/-$/, '');
         const n = getSingleTicketCount(t) || 1;
         const isChild = (t.note || '').includes('子票');
+        const isMother = (t.note || '').includes('母票');
         if (nums.length <= 1) {
             // 单人：成员色；拆分出的子票用初音色
             const bg = isChild ? COLOR_MIKU : cOwner;
-            return `<span class="ticket-no-badge" style="background:${bg};">${esc(label)}</span>`;
+            const num = nums[0] || '';
+            return `<span class="ticket-no-badge" style="background:${bg};">${esc(label + '-' + num)}</span>`;
         }
         // 2连/多座：母(第一段=成员色) + 子(后续=初音色)
         const pieces = nums.map((num, idx) =>
@@ -1377,15 +1379,21 @@
         if (!assertCanManage(t)) return;
 
         const seats = seatListOf(t);
-        if (seats.length < 2) { alert('这张票只有一个座位，无需拆分。'); return; }
+        const isUnassigned = !seats.length || String(t.seat).trim() === '待分配';
         if (seats.length > 2) { alert('⚠️ 目前仅支持拆 2连票（两个座位）。'); return; }
         if (grpOf(t)) { alert('这张票已经是拆分过的单张，请用「合并」或先合并回 2连。'); return; }
 
         const basePrice = parseTicketPrice(t.price);
-        if (!confirm(`✂️ 确认拆分这张 2连票吗？\n\n${ticketDesc(t)}\n\n拆分后将成为两张独立单张票，价格自动对半：\n${basePrice ? '原价 ' + formatTicketPrice(t.price) + ' → 每张 ' + formatTicketPrice(buildPriceStr(basePrice.cur, (basePrice.amt / 2))) : '（无价格）'}\n\n各自可单独转出/标记/填买家。`)) return;
+        const seatDesc = seats.length === 2
+            ? `座位 ${seats[0]} / ${seats[1]}`
+            : '（座位待分配，拆成两张后再分别填）';
+        if (!confirm(`✂️ 确认拆分这张 2连票吗？\n\n${ticketDesc(t)}\n\n拆分后成为两张独立票：${seatDesc}\n${basePrice ? '价格自动对半：' + formatTicketPrice(t.price) + ' → 每张 ' + formatTicketPrice(buildPriceStr(basePrice.cur, (basePrice.amt / 2))) : '（无价格）'}\n\n各自可单独转出/标记/填座位买家。`)) return;
 
         const grp = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const seatA = seats[0], seatB = seats[1];
+        // 母票保留原记录（有具体座位→取第一个；待分配→保持待分配）
+        const seatA = seats.length === 2 ? seats[0] : (String(t.seat).trim() === '待分配' || !t.seat ? '待分配' : t.seat);
+        // 子票：有具体两个座位→取第二个；待分配→也先待分配
+        const seatB = seats.length === 2 ? seats[1] : '待分配';
 
         // 价格对半
         let priceA = '', priceB = '';
@@ -1400,8 +1408,9 @@
         const noteA = stripLink + `[母票][GRP:${grp}]`;
         const noteB = stripLink + `[子票][GRP:${grp}]`;
 
+        const blockCode = parseBlockFromNote(t.note);
         const { error: e1 } = await _supabase.from('tickets')
-            .update({ seat: seatA, price: priceA, note: noteA, uniq_key: seatDedupKey(currentVenue, parseBlockFromNote(t.note), seatA) })
+            .update({ seat: seatA, price: priceA, note: noteA, uniq_key: seatDedupKey(currentVenue, blockCode, seatA) })
             .eq('id', t.id);
         if (e1) { alert('拆分失败（更新母票）：' + e1.message); return; }
 
@@ -1411,7 +1420,7 @@
             status: t.status,
             buyer: t.buyer,
             price: priceB,
-            uniq_key: seatDedupKey(t.show, parseBlockFromNote(t.note), seatB),
+            uniq_key: seatDedupKey(t.show, blockCode, seatB),
             memo: t.memo || '',
             note: noteB
         }]).select('id');
@@ -1588,6 +1597,8 @@
                 
                 let typeDisplay = `👤 单人`;
                 if (t.note && t.note.includes('2连番')) typeDisplay = `<span style="color:#00796b; font-weight:bold;">👭 2连</span>`;
+                else if (t.note && t.note.includes('子票')) typeDisplay = `<span style="color:#2bb3a6; font-weight:bold;">👧 子票</span>`;
+                else if (t.note && t.note.includes('母票')) typeDisplay = `<span style="color:#e965a3; font-weight:bold;">👩 母票</span>`;
                 else if (t.note && (t.note.includes('3连番') || t.note.includes('4连番'))) typeDisplay = `<span style="color:#999;">旧数据多连</span>`;
 
                 const ticketNo = ticketNoMapById[t.id] || '票-';
@@ -1600,17 +1611,19 @@
                 const canM = canManageTicket(t);
                 const seatCount = seatListOf(t).length;
                 const isSplit = !!grpOf(t);
+                // 拆分依据：只要是 2连票（note 含 2连番）就可拆，不论有没有座位（待分配也能拆）
+                const is2ren = !!(t.note && t.note.includes('2连番'));
                 const actionBtns = [];
                 if (canM) {
                     actionBtns.push(`<button onclick="openTransferModal('${t.id}')" style="font-size:0.75rem; background:#00897b; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;">↔️ 转</button>`);
                     if (origOwner && origOwner !== ownerName) {
                         actionBtns.push(`<button onclick="returnTicket('${t.id}')" style="font-size:0.75rem; background:#b388eb; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="退回给原主 ${esc(origOwner)}">⬅️ 退回</button>`);
                     }
-                    // 2连/多座 → 拆分；拆出来的单张（带组号）→ 合并
-                    if (seatCount >= 2 && !isSplit) {
+                    // 2连票（含待分配）→ 可拆分；拆出来的单张（带组号）→ 可合并
+                    if (is2ren && !isSplit) {
                         actionBtns.push(`<button onclick="splitTicket('${t.id}')" style="font-size:0.75rem; background:#ff8fb3; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="拆成母票+子票，可分别操作">✂️ 拆</button>`);
                     }
-                    if (seatCount === 1 && isSplit) {
+                    if (seatCount <= 1 && isSplit) {
                         actionBtns.push(`<button onclick="mergeTicket('${t.id}')" style="font-size:0.75rem; background:#9b8cff; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; margin-right:3px;" title="与同组另一张合并回 2连">🔗 合</button>`);
                     }
                     actionBtns.push(`<button onclick="deleteSingleTicket('${t.id}')" style="font-size:0.75rem; background:#e71d36; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">删</button>`);
