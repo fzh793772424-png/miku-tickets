@@ -1649,16 +1649,20 @@
             return matchesStatus && matchesMember && matchesKW;
         });
 
-        // 自动排序：按 成员固定顺序 → 状态(在手<预定<已出) → 座位号 → 录入时间
+        // 自动排序：按 成员固定顺序 → 票号(取第一个号数字)从小到大 → 座位 → 时间
         const ORDER_MEMBER = { '大瓜': 0, '星黎': 1, '薯饼': 2, '村民': 3, 'X': 4, '未署名': 9 };
-        const ORDER_STATUS = { '在手': 0, '预定': 1, '已出': 2 };
+        function noStart(t) {
+            const s = String(ticketNoMapById[t.id] || '');
+            const m = s.match(/-(\d+)/);           // 形如 瓜-12,13 → 取 12
+            if (m) return parseInt(m[1], 10);
+            return Number.MAX_SAFE_INTEGER;        // 无编号排后面
+        }
         filtered.sort((a, b) => {
             const ma = ORDER_MEMBER[operatorOf(a)] ?? 9;
             const mb = ORDER_MEMBER[operatorOf(b)] ?? 9;
             if (ma !== mb) return ma - mb;
-            const sa = ORDER_STATUS[a.status] ?? 3;
-            const sb = ORDER_STATUS[b.status] ?? 3;
-            if (sa !== sb) return sa - sb;
+            const na = noStart(a), nb = noStart(b);
+            if (na !== nb) return na - nb;
             const sa2 = String(a.seat || '');
             const sb2 = String(b.seat || '');
             if (sa2 !== sb2) return sa2 < sb2 ? -1 : 1;
