@@ -342,6 +342,15 @@
         <div class="legend-item"><span class="dot bg-已出"></span> 已出票</div>
     </div>
 
+    <div style="text-align:center; font-size:0.78rem; color:#888; margin-bottom:8px;">
+        票号颜色：<span style="display:inline-block; width:10px; height:10px; background:#e965a3; border-radius:3px;"></span>大瓜(ルカ)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f2c106; border-radius:3px;"></span>星黎(リン)　
+        <span style="display:inline-block; width:10px; height:10px; background:#e5484d; border-radius:3px;"></span>薯饼(MEIKO)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f07c1f; border-radius:3px;"></span>村民(レン)　
+        <span style="display:inline-block; width:10px; height:10px; background:#4a6fd4; border-radius:3px;"></span>X(KAITO)　
+        <span style="display:inline-block; width:10px; height:10px; background:#2bb3a6; border-radius:3px;"></span>=子票(初音)
+    </div>
+
     <div class="map-section">
         <div class="stage">ステージ (STAGE 舞台)</div>
         <div id="venue-layout-container"></div>
@@ -1004,7 +1013,43 @@
         return 1;
     }
 
-    // ===== 🎤 团员票池：全场馆按人汇总 =====
+    // ===== 🎨 成员专属色（C社五子，母票用）=====
+    // 大瓜=巡音ルカ(粉) 星黎=鏡音リン(黄) 薯饼=MEIKO(红) 村民=鏡音レン(橙) X=KAITO(蓝)
+    // 子票统一用初音青绿
+    const MEMBER_COLORS = {
+        '大瓜': '#e965a3',
+        '星黎': '#f2c106',
+        '薯饼': '#e5484d',
+        '村民': '#f07c1f',
+        'X': '#4a6fd4'
+    };
+    const COLOR_MIKU = '#2bb3a6'; // 子票色（初音青绿深一些保证白字可读）
+    function memberColor(name) { return MEMBER_COLORS[name] || '#607d8b'; }
+
+    // 生成彩色票号 HTML：
+    // 单人票 → 母票色（成员色）一个号
+    // 2连票 → 前半母票用成员色，后半子票用初音色
+    function coloredTicketNo(t, plainNo) {
+        const owner = operatorOf(t) || '未署名';
+        const cOwner = memberColor(owner);
+        // plainNo 形如 "大瓜-1,2"（2连）或 "大瓜-3"（单人）
+        const dash = plainNo.lastIndexOf('-');
+        const prefix = dash >= 0 ? plainNo.slice(0, dash + 1) : (plainNo + '-');
+        const numPart = dash >= 0 ? plainNo.slice(dash + 1) : '';
+        const nums = numPart ? numPart.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const label = prefix.replace(/-$/, '');
+        const n = getSingleTicketCount(t) || 1;
+        if (nums.length <= 1) {
+            // 单人：成员色
+            return `<span class="ticket-no-badge" style="background:${cOwner};">${esc(label)}</span>`;
+        }
+        // 2连/多座：母(第一段=成员色) + 子(后续=初音色)
+        const pieces = nums.map((num, idx) =>
+            `<span class="ticket-no-badge" style="background:${idx === 0 ? cOwner : COLOR_MIKU};">${esc(label + '-' + num)}</span>`
+        );
+        return `<span style="white-space:nowrap;">${pieces.join(' ')}</span>`;
+    }
+
     // 从票的 note 里取操作人（BY:xxx）= 当前管理人
     function operatorOf(t) {
         if (t.note && t.note.includes('BY:')) {
@@ -1153,8 +1198,9 @@
                     const loc = `${block && block !== 'UNASSIGNED' ? block + '区' : '待定'} ${t.seat || '待分配'}`;
                     const statusIcon = t.status === '在手' ? '🟢' : t.status === '预定' ? '🟠' : '🔴';
                     const fromTag = originalOwnerOf(t) ? `<span style="color:#d63384; font-size:0.68rem;"> 转自${esc(originalOwnerOf(t))}</span>` : '';
+                    const noHtml = coloredTicketNo(t, ticketNoMapById[t.id] || ('票-' + t.id));
                     return `<tr>
-                        <td>${esc(ticketNoMapById[t.id] || t.id)}</td>
+                        <td>${noHtml}</td>
                         <td>${esc(t.show || '')}</td>
                         <td>${esc(loc)}</td>
                         <td>${statusIcon} ${esc(t.status)}</td>
@@ -1411,6 +1457,7 @@
                 else if (t.note && (t.note.includes('3连番') || t.note.includes('4连番'))) typeDisplay = `<span style="color:#999;">旧数据多连</span>`;
 
                 const ticketNo = ticketNoMapById[t.id] || '票-';
+                const ticketNoHtml = coloredTicketNo(t, ticketNo);
                 const origOwner = originalOwnerOf(t);
                 const ownerName = operatorOf(t) || '未署名';
                 const transferBadge = origOwner ? `<span style="margin-left:4px; background:#fff0f5; color:#d63384; border:1px solid #ffc2d9; font-size:0.7rem; border-radius:10px; padding:1px 6px; cursor:default;" title="这张票是 ${esc(origOwner)} 转来的">↔️ 转自${esc(origOwner)}</span>` : '';
@@ -1466,7 +1513,7 @@
 
                 return `
                     <tr>
-                        <td><span class="ticket-no-badge">${esc(ticketNo)}</span>${transferBadge}</td>
+                        <td>${ticketNoHtml}${transferBadge}</td>
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
                         <td>
