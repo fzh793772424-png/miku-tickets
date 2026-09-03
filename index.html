@@ -906,11 +906,32 @@
     // 数据每次刷新后重建 id → 票号 映射：
     // 编号按【张】分配并跟随当前主人(BY)：同场馆内每人连续编号，用短名
     // 2连票 = 两张 → 占两个号，显示如 瓜-1,2；单人 → 瓜-3
+    // 拆出来的母/子（同 GRP）会按"组最早时间"相邻排序 → 子票紧跟母票编号
     function rebuildTicketNoMap() {
         ticketNoMapById = {};
         const counter = {};
-        // 遍历顺序稳定（fetch 已按 created_at 升序）
+
+        // 计算每个 GRP 组的最早 created_at（用于让同组票挨在一起）
+        const grpAnchor = {};
         allTickets.forEach(t => {
+            const g = grpOf(t);
+            if (!g) return;
+            const ct = new Date(t.created_at).getTime();
+            if (!(g in grpAnchor) || ct < grpAnchor[g]) grpAnchor[g] = ct;
+        });
+
+        // 排序键：(场馆+主人, 组锚点, 自身创建时间) → 同组相邻且内部按时间
+        const ordered = allTickets.slice().sort((a, b) => {
+            const ka = (a.show || '?') + '|' + (operatorOf(a) || '未署名');
+            const kb = (b.show || '?') + '|' + (operatorOf(b) || '未署名');
+            if (ka !== kb) return ka < kb ? -1 : 1;
+            const ga = grpOf(a) ? (grpAnchor[grpOf(a)] || 0) : new Date(a.created_at).getTime();
+            const gb = grpOf(b) ? (grpAnchor[grpOf(b)] || 0) : new Date(b.created_at).getTime();
+            if (ga !== gb) return ga - gb;
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
+
+        ordered.forEach(t => {
             const owner = operatorOf(t) || '未署名';
             const short = shortName(owner);
             const key = (t.show || '?') + '|' + owner;
