@@ -303,7 +303,7 @@
         <div class="list-header-tools">
             <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <select id="filter-member" onchange="renderTicketTable()" style="padding:4px 8px; font-size:0.85rem;">
+                <select id="filter-member" onchange="renderTicketTable(); highlightActiveMemberCard();" style="padding:4px 8px; font-size:0.85rem;">
                     <option value="ALL">👥 全部成员</option>
                     <option value="大瓜">大瓜</option>
                     <option value="星黎">星黎</option>
@@ -1177,7 +1177,9 @@
                 ? Object.entries(s.inFrom).map(([k, v]) => `${k}${v}张`).join(' ')
                 : '—';
             html += `
-                <div class="member-card" onclick="openMemberModal('${name}')">
+                <div class="member-card" id="member-card-${name}" onclick="filterByMember('${name}')" style="position:relative; cursor:pointer;">
+                    <button onclick="event.stopPropagation(); openMemberModal('${name}')" title="查看详情/转出转入"
+                        style="position:absolute; top:6px; right:6px; font-size:0.68rem; background:#fff; color:#888; border:1px solid #ddd; border-radius:10px; padding:1px 7px; cursor:pointer;">详情</button>
                     <div class="m-name">${name}</div>
                     <div class="m-counts">
                         <span>🟢在手 <b>${s.inHand}</b></span>
@@ -1191,13 +1193,23 @@
         });
 
         poolGrid.innerHTML = html || '<div style="color:#999;">暂无任何票</div>';
+        highlightActiveMemberCard();
 
         // 底部合计（全团应收 = 所有已出票，总额不变）
         const allRecv = sumReceivable(allTickets.filter(t => t.status === '已出'));
         const allTotal = allTickets.reduce((a, t) => a + getSingleTicketCount(t), 0);
-        // 母/子票数：单张=1母；2连=1母+1子 → 母票数=记录数，子票数=总张数-记录数
-        const mothers = allTickets.length;
-        const children = allTotal - mothers;
+        // 母/子票统计：单张=1母；2连(1条记录2张)=1母+1子；
+        // 拆出来的 [母票]=母、[子票]=子
+        let mothers = 0, children = 0;
+        allTickets.forEach(t => {
+            const n = getSingleTicketCount(t) || 1;
+            const note = t.note || '';
+            if (note.includes('子票')) { children += n; return; }   // 拆出的子票：整体算子
+            if (note.includes('母票')) { mothers += n; return; }    // 拆出的母票：整体算母
+            // 普通记录（含未拆 2连）：第1张=母，其余=子
+            mothers += 1;
+            children += (n - 1);
+        });
         let dom = 0, over = 0;
         allTickets.forEach(t => {
             const n = getSingleTicketCount(t);
@@ -1208,6 +1220,28 @@
         document.getElementById('pool-total-money').innerText = `全团应收(已出)：${formatReceivable(allRecv)}`;
         const mcEl = document.getElementById('mother-child-stat');
         if (mcEl) mcEl.innerText = `🎟 母票 ${mothers} 张　·　💚 子票 ${children} 张`;
+    }
+
+    // 点成员卡片 → 把下方票据列表切成该成员的票，并滚动过去
+    function filterByMember(name) {
+        const sel = document.getElementById('filter-member');
+        if (sel) { sel.value = name; }
+        renderTicketTable();
+        highlightActiveMemberCard();
+        const listEl = document.querySelector('.ticket-list-card');
+        if (listEl) listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 高亮当前正在筛选的成员卡片（或都不高亮）
+    function highlightActiveMemberCard() {
+        const sel = document.getElementById('filter-member');
+        const active = sel ? sel.value : 'ALL';
+        document.querySelectorAll('.member-card').forEach(el => {
+            const forName = el.id ? el.id.replace('member-card-', '') : '';
+            const isActive = forName && forName === active;
+            el.style.boxShadow = isActive ? '0 0 0 3px #39C5BB, 0 4px 16px rgba(57,197,187,0.35)' : '';
+            el.style.borderColor = isActive ? '#39C5BB' : '';
+        });
     }
 
     // 成员明细弹窗：显示 当前名下的票与应收 + 转入来自谁/转出给谁
