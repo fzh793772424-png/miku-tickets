@@ -102,12 +102,12 @@
         .stage { background: linear-gradient(120deg,#a17fe0,#ff8fb3); color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: var(--radius); margin-bottom: 15px; letter-spacing: 2px; box-shadow: 0 3px 12px rgba(255,143,179,0.3); }
         .map-section { background: white; padding: 20px; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(255,143,179,0.12); overflow-x: auto; border: 1px solid #ffe9f1; }
         
-        .block-row { display: flex; gap: 5px; justify-content: flex-start; margin-bottom: 8px; flex-wrap: nowrap; }
-        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 8px; padding: 6px 2px; text-align: center; cursor: pointer; transition: all 0.15s; min-width: 46px; min-height: 30px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position: relative; }
+        .block-row { display: flex; gap: 8px; justify-content: safe center; margin: 4px auto 10px; flex-wrap: nowrap; overflow-x: auto; padding: 4px 2px; -webkit-overflow-scrolling: touch; }
+        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 10px; padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.15s; min-height: 52px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position: relative; }
         .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 2px 10px rgba(255,143,179,0.4); }
-        .block-title { font-weight: bold; font-size: 0.8rem; white-space: nowrap; }
+        .block-title { font-weight: bold; font-size: 0.95rem; white-space: nowrap; }
         
-        .block-badge { position: absolute; top: -6px; right: -6px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.65rem; border-radius: 8px; padding: 1px 5px; font-weight: bold; border: 1px solid white; }
+        .block-badge { position: absolute; top: -6px; right: -6px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.68rem; border-radius: 8px; padding: 2px 6px; font-weight: bold; border: 1px solid white; }
 
         /* ===== 座位地图整体缩放 ===== */
         .map-zoom-bar { display:flex; align-items:center; gap:8px; justify-content:center; margin: 4px 0 8px; font-size:0.8rem; color:#888; }
@@ -724,12 +724,12 @@
     }
 
     const HIROSHIMA_CONFIG = {
-        '1阶-左区': { startCol: 1, endCol: 28, startSeat: 1, endSeat: 22 },
-        '1阶-中区': { startCol: 1, endCol: 28, startSeat: 23, endSeat: 44 },
-        '1阶-右区': { startCol: 1, endCol: 28, startSeat: 45, endSeat: 55 },
-        '2阶-左区': { startCol: 1, endCol: 10, startSeat: 1, endSeat: 22 },
-        '2阶-中区': { startCol: 1, endCol: 10, startSeat: 23, endSeat: 40 },
-        '2阶-右区': { startCol: 1, endCol: 10, startSeat: 41, endSeat: 56 }
+        '1阶-左区': { startCol: 1, endCol: 28, startSeat: 1, endSeat: 22, label: '左区' },
+        '1阶-中区': { startCol: 1, endCol: 28, startSeat: 23, endSeat: 44, label: '中区' },
+        '1阶-右区': { startCol: 1, endCol: 28, startSeat: 45, endSeat: 55, label: '右区' },
+        '2阶-左区': { startCol: 1, endCol: 10, startSeat: 1, endSeat: 22, label: '左区' },
+        '2阶-中区': { startCol: 1, endCol: 10, startSeat: 23, endSeat: 40, label: '中区' },
+        '2阶-右区': { startCol: 1, endCol: 10, startSeat: 41, endSeat: 56, label: '右区' }
     };
 
     const OSAKA_CONFIG = {
@@ -744,6 +744,37 @@
         'Z9': { startCol: 9, endCol: 48, startSeat: 91, endSeat: 96 },
         'L-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, rowLetters: ['A列','B列','C列','D列','E列'] },
         'R-着席': { startCol: 1, endCol: 5, startSeat: 1, endSeat: 37, rowLetters: ['A列','B列','C列','D列','E列'] }
+    };
+
+    // ===== 🗺️ 场馆布局表（换场地/改排布，只改这里！）=====
+    // 每个场馆：一列行，每行 = { blocks: [...] }；块里可放：
+    //   'A1'   → 对应 A1 区块（config 决定座位数，width 自动）
+    //   { label:'PA控台', pa:true }  → 占位块（不可点，如控制台/过道）
+    // 行顺序 = 显示顺序（舞台在最后渲染前按行序画在下方）
+    const VENUE_LAYOUT = {
+        '东京场': {
+            label: '幕张 Messe 9馆',
+            rows: [
+                { blocks: ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','A12','A13','A14'] },
+                { blocks: ['B1','B2','B3','B4','B5','B6','B7','B8','B9','B10','B11','B12','B13','B14'] },
+                { blocks: ['C1','C2','C3','C4','C5','C6','C7','C8','C9','C10','C11','C12','C13','C14'] },
+                { blocks: ['D1','D2','D3', { label:'PA控台', pa:true }, 'D7','D8','D9'] }
+            ]
+        },
+        '广岛场': {
+            label: '上野学园大厅',
+            rows: [
+                { header: '1阶 客席', blocks: ['1阶-左区','1阶-中区','1阶-右区'] },
+                { header: '2阶 客席', blocks: ['2阶-左区','2阶-中区','2阶-右区'] }
+            ]
+        },
+        '大阪场': {
+            label: 'Intex Osaka 5号馆A',
+            rows: [
+                { header: '指定席', blocks: ['Z1','Z2','Z3','Z4','Z5','Z6','Z7','Z8','Z9'] },
+                { header: '着席指定席', blocks: ['L-着席', { label:'PA控台区', pa:true }, 'R-着席'] }
+            ]
+        }
     };
 
     function init() {
@@ -813,34 +844,22 @@
 
     function renderCurrentVenue() {
         const container = document.getElementById('venue-layout-container');
-        if (currentVenue === '东京场') {
-            let html = '<div class="block-row">';
-            for(let i=1; i<=14; i++) html += makeBlockHtml(`A${i}`, `A${i}`);
-            html += '</div><div class="block-row">';
-            for(let i=1; i<=14; i++) html += makeBlockHtml(`B${i}`, `B${i}`);
-            html += '</div><div class="block-row">';
-            for(let i=1; i<=14; i++) html += makeBlockHtml(`C${i}`, `C${i}`);
-            html += '</div><div class="block-row" style="margin-top:15px;">';
-            html += makeBlockHtml('D1','D1') + makeBlockHtml('D2','D2') + makeBlockHtml('D3','D3');
-            html += `<div class="block-box" style="background:#eee; cursor:default; min-width:100px;"><div class="block-title" style="margin-top:6px;">PA控台</div></div>`;
-            html += makeBlockHtml('D7','D7') + makeBlockHtml('D8','D8') + makeBlockHtml('D9','D9') + '</div>';
-            container.innerHTML = html;
-        } else if (currentVenue === '广岛场') {
-            let html = '<h4 style="margin:5px 0;">1 阶客席</h4><div class="block-row">';
-            html += makeBlockHtml('1阶-左区', '1阶 左侧席') + makeBlockHtml('1阶-中区', '1阶 中央席') + makeBlockHtml('1阶-右区', '1阶 右侧席');
-            html += '</div><h4 style="margin:15px 0 5px 0;">2 阶客席</h4><div class="block-row">';
-            html += makeBlockHtml('2阶-左区', '2阶 左侧席') + makeBlockHtml('2阶-中区', '2阶 中央席') + makeBlockHtml('2阶-右区', '2阶 右侧席');
-            html += '</div>';
-            container.innerHTML = html;
-        } else {
-            let html = '<h4 style="margin:5px 0;">指定席 (粉色区)</h4><div class="block-row">';
-            html += makeBlockHtml('Z1', '1-6番') + makeBlockHtml('Z2', '7-18番') + makeBlockHtml('Z3', '19-30番') + makeBlockHtml('Z4', '31-42番');
-            html += makeBlockHtml('Z5', '43-54番') + makeBlockHtml('Z6', '55-66番') + makeBlockHtml('Z7', '67-78番') + makeBlockHtml('Z8', '79-90番') + makeBlockHtml('Z9', '91-96番');
-            html += '</div><h4 style="margin:15px 0 5px 0;">着席指定席 (后方蓝色区)</h4><div class="block-row">';
-            html += makeBlockHtml('L-着席', 'L-A~E列');
-            html += `<div class="block-box" style="background:#eee; cursor:default; min-width:120px;"><div class="block-title" style="margin-top:6px;">PA 控台区</div></div>`;
-            html += makeBlockHtml('R-着席', 'R-A~E列');
-            html += '</div>';
+        const layout = VENUE_LAYOUT[currentVenue];
+        if (layout) {
+            let html = '';
+            layout.rows.forEach(row => {
+                if (row.header) html += `<h4 style="margin:10px 0 5px; text-align:center; color:#b3527f;">${esc(row.header)}</h4>`;
+                html += '<div class="block-row">';
+                row.blocks.forEach(b => {
+                    if (b && typeof b === 'object' && b.pa) {
+                        // 占位块（控台/过道）：不点、不做票块
+                        html += `<div class="block-box" style="background:#eee; color:#999; cursor:default; min-width:${b.w || 90}px;"><div class="block-title">${esc(b.label || '')}</div></div>`;
+                    } else if (typeof b === 'string') {
+                        html += makeBlockHtml(b, b);
+                    }
+                });
+                html += '</div>';
+            });
             container.innerHTML = html;
         }
         // 重置缩放
@@ -854,10 +873,24 @@
         populateBlockDropdown();
     }
 
+    // 根据场馆区块配置估算"视觉宽度等级"（列越多/座位越多 → 块越宽，呈现中间宽两边窄）
+    function blockWidthPx(venue, code) {
+        const conf = getVenueConf(venue, code);
+        if (!conf) return 64;
+        if (conf.isStanding || conf.standing) return 84;          // 站席略宽
+        const cols = (conf.endCol - conf.startCol) + 1;           // 列数
+        // 用"列数"决定宽度：1 列档位约 +8px；保证最小 46 最大 150
+        return Math.max(46, Math.min(150, 38 + cols * 8));
+    }
+
     function makeBlockHtml(code, label) {
-        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')">
+        const w = blockWidthPx(currentVenue, code);
+        const conf = getVenueConf(currentVenue, code);
+        // 配置里可写友好显示名 label，否则用 code
+        const show = (conf && conf.label) ? conf.label : (label || code);
+        return `<div class="block-box" id="block-${code}" onclick="openSeatModal('${code}')" style="min-width:${w}px;">
             <span class="block-badge" id="badge-${code}" style="display:none;">0</span>
-            <div class="block-title">${label}</div>
+            <div class="block-title">${esc(show)}</div>
         </div>`;
     }
 
