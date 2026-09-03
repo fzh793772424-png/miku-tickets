@@ -17,6 +17,9 @@
         /* 对话气泡：浮在海报右侧（放在 poster-col 内，不裁切） */
         #miku-bubble { position: absolute; left: calc(100% + 10px); top: 30px; width: 260px; z-index: 800; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.7; }
         #miku-bubble .bubble-tail { position:absolute; top:16px; left:-7px; width:0; height:0; border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:8px solid #fff; }
+        #miku-bubble .miku-chip { border:1px solid #d8f0ec; background:#f3fcfb; color:#0f7d74; border-radius:999px; padding:3px 10px; font-size:0.72rem; cursor:pointer; transition:all .15s; }
+        #miku-bubble .miku-chip:hover { background:#ffe3ee; border-color:#ffc2d9; color:#b3527f; transform: translateY(-1px); }
+        #miku-bubble #miku-mood { font-size:1.3rem; }
         .container { flex: 1; min-width: 0; }
         /* 窄屏：隐藏海报栏，回归单列 */
         @media (max-width: 1000px) { .poster-col { display: none; } .shell { display: block; } }
@@ -166,16 +169,24 @@
 <div class="shell">
     <!-- 左侧海报柱（1.JPG 竖版图，点击可对话） -->
     <div class="poster-col">
-        <div class="poster-card" id="miku-poster" onclick="mikuTalk()" style="cursor:pointer;" title="和初音说话♪">
+        <div class="poster-card" id="miku-poster" onclick="posterTap()" style="cursor:pointer;" title="点我聊天，快速连点有彩蛋♪">
             <img src="1.JPG" alt="初音ミク">
             <div class="poster-caption">✧ 初音ミク Magical Mirai 2027 ✧</div>
         </div>
         <!-- 对话气泡：默认隐藏，点海报/进入页面时出现（放在卡片外避免裁切） -->
         <div id="miku-bubble" style="display:none;">
             <div class="bubble-tail"></div>
+            <div id="miku-mood" style="font-size:1.3rem; margin-bottom:2px;">🎀</div>
             <div id="miku-bubble-text">♪ 你好呀！想和我聊聊天吗？</div>
-            <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:10px;">
-                <button onclick="mikuTalk()" style="border:1px solid #ffc2d9; background:#fff; color:#b3527f; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">再聊一句♪</button>
+            <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:8px;">
+                <button class="miku-chip" onclick="mikuGreet()">👋 早安</button>
+                <button class="miku-chip" onclick="mikuGoodnight()">🌙 晚安</button>
+                <button class="miku-chip" onclick="mikuPoke()">👉 戳戳</button>
+                <button class="miku-chip" onclick="mikuFortune()">🎴 今日一句</button>
+                <button class="miku-chip" onclick="mikuCheer()">💪 求加油</button>
+            </div>
+            <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:8px;">
+                <button onclick="mikuTalk()" style="border:1px solid #ffc2d9; background:#fff; color:#b3527f; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">随便聊聊♪</button>
                 <button onclick="closeMikuBubble()" style="border:1px solid #ccc; background:#fff; color:#999; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">关闭</button>
             </div>
         </div>
@@ -2567,29 +2578,96 @@
         '💤 辛苦啦，累了就休息——少し休んで、また歌おうね。',
         '🌸 祝大家都能顺利收到想要的票！また、どこかで会えるよね？じゃあね～'
     ];
+    const MIKU_POKE = [
+        'えっ？！吓我一跳～ 别戳啦，会唱错调的！',
+        '喂喂——这样戳，票票会害羞的啦！',
+        'むむっ…再戳的话，我要用葱打你哦（开玩笑的）～',
+        '呼哇…戳够了吗？还想和我玩的话点别的按钮呀♪',
+        'へへ～戳得还挺开心的，不过要轻一点哦！'
+    ];
+    const MIKU_CHEER = [
+        '加油！録音も録票も、あなたなら大丈夫！39！',
+        'がんばって！整理票票的你，比谁都耀眼哦～',
+        '就算手忙脚乱也没关系，一首歌的功夫就能理好，我陪你～',
+        '你是最棒的！票票们都会乖乖排队的～ 💪'
+    ];
+    const MIKU_FORTUNE = [
+        '🎴 今日の運勢：大吉！适合把「已出」的票票好好记账～',
+        '🎴 今日一句：手边的票，就是通往舞台的入场券，好好珍惜～',
+        '🎴 今日の運勢：小吉！录票时眼睛要亮亮的，别手滑选错人哦～',
+        '🎴 今日一句：要和团员们说好多好多「39」才够呢～',
+        '🎴 今日の運勢：吉！转票前记得先点「确认」，歌才不会走调♪'
+    ];
     let mikuLineIdx = -1;
-    function mikuTalk() {
+    let mikuTapCount = 0;
+    let mikuTapTimer = null;
+    function mikuMood(face) { const m = document.getElementById('miku-mood'); if (m) m.innerText = face || '🎀'; }
+    function mikuSay(text, face) {
         const bubble = document.getElementById('miku-bubble');
-        const text = document.getElementById('miku-bubble-text');
-        if (!bubble || !text) return;
-        mikuLineIdx = (mikuLineIdx + 1) % MIKU_LINES.length;
-        text.innerText = MIKU_LINES[mikuLineIdx];
+        const el = document.getElementById('miku-bubble-text');
+        if (!bubble || !el) return;
+        el.innerText = text;
+        if (face) mikuMood(face);
         bubble.style.display = 'block';
+    }
+    function mikuTalk() {
+        mikuLineIdx = (mikuLineIdx + 1) % MIKU_LINES.length;
+        mikuSay(MIKU_LINES[mikuLineIdx], '🎀');
+    }
+    // 按时间自动问候
+    function mikuGreet() {
+        const h = new Date().getHours();
+        if (h >= 5 && h < 11) mikuSay('おはよう！新的一天，票票们等着你整理呢～ ☀️', '🌞');
+        else if (h >= 11 && h < 18) mikuSay('こんにちは～ 下午好！今天录了几张票啦？', '☁️');
+        else if (h >= 18 && h < 23) mikuSay('こんばんは！晚上好～ 收工前来理理票票吧♪', '🌆');
+        else mikuSay('夜深了还不睡呀？录票要小心手滑哦…おやすみ前にちゃんと保存してね 🌙', '🌙');
+    }
+    function mikuGoodnight() {
+        mikuSay('おやすみなさい～ 票票们也会好好睡一觉的，明天见！💤', '💤');
+    }
+    function mikuPoke() {
+        const r = Math.floor(Math.random() * MIKU_POKE.length);
+        mikuSay(MIKU_POKE[r], '😳');
+    }
+    function mikuFortune() {
+        const r = Math.floor(Math.random() * MIKU_FORTUNE.length);
+        mikuSay(MIKU_FORTUNE[r], '🔮');
+    }
+    function mikuCheer() {
+        const r = Math.floor(Math.random() * MIKU_CHEER.length);
+        mikuSay(MIKU_CHEER[r], '💪');
     }
     // 进入页面后（登录成功看到看板时）自动打招呼
     function mikuAutoSay() {
         const bubble = document.getElementById('miku-bubble');
         if (!bubble || bubble.style.display === 'block') return;
         setTimeout(function () {
-            mikuTalk();
-            // 几秒后若用户没互动，自动收回，避免一直挡着
+            mikuGreet();   // 自动按时间打招呼
             setTimeout(function () {
                 const b = document.getElementById('miku-bubble');
-                if (b && b.style.display === 'block' && mikuLineIdx === 0) {
+                if (b && b.style.display === 'block') {
+                    // 用户没互动时自动收回，避免挡界面
                     b.style.display = 'none';
                 }
-            }, 8000);
+            }, 9000);
         }, 600);
+    }
+    // 海报点击：普通点=随便聊聊；连点5下触发彩蛋
+    function posterTap() {
+        mikuTapCount++;
+        if (mikuTapTimer) clearTimeout(mikuTapTimer);
+        mikuTapTimer = setTimeout(function () { mikuTapCount = 0; }, 1500);
+        if (mikuTapCount >= 5) {
+            mikuTapCount = 0;
+            const easter = [
+                '喂喂…连点这么多下，是想把我召唤成演唱会嘉宾吗？！🎤',
+                'ハイスピードでクリックしないで～ 我头都晕啦！',
+                '好啦好啦，我在这呢！专心整理票票吧～39！'
+            ];
+            mikuSay(easter[Math.floor(Math.random() * easter.length)], '😵');
+            return;
+        }
+        mikuTalk();
     }
     function closeMikuBubble() {
         const bubble = document.getElementById('miku-bubble');
