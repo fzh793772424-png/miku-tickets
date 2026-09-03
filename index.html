@@ -302,7 +302,15 @@
     <div class="ticket-list-card">
         <div class="list-header-tools">
             <strong style="font-size:1rem;">📋 当前场馆票据明细</strong>
-            <div style="display:flex; gap:10px; align-items:center;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <select id="filter-member" onchange="renderTicketTable()" style="padding:4px 8px; font-size:0.85rem;">
+                    <option value="ALL">👥 全部成员</option>
+                    <option value="大瓜">大瓜</option>
+                    <option value="星黎">星黎</option>
+                    <option value="薯饼">薯饼</option>
+                    <option value="村民">村民</option>
+                    <option value="X">X</option>
+                </select>
                 <select id="filter-status" onchange="renderTicketTable()" style="padding:4px 8px; font-size:0.85rem;">
                     <option value="ALL">全部状态</option>
                     <option value="在手">在手</option>
@@ -343,10 +351,10 @@
     </div>
 
     <div style="text-align:center; font-size:0.78rem; color:#888; margin-bottom:4px;">
-        票号颜色：<span style="display:inline-block; width:10px; height:10px; background:#e965a3; border-radius:3px;"></span>瓜(ルカ)　
-        <span style="display:inline-block; width:10px; height:10px; background:#f2c106; border-radius:3px;"></span>星(リン)　
-        <span style="display:inline-block; width:10px; height:10px; background:#e5484d; border-radius:3px;"></span>饼(MEIKO)　
-        <span style="display:inline-block; width:10px; height:10px; background:#f07c1f; border-radius:3px;"></span>村(レン)　
+        票号颜色：<span style="display:inline-block; width:10px; height:10px; background:#e965a3; border-radius:3px;"></span>大瓜(ルカ)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f2c106; border-radius:3px;"></span>星黎(リン)　
+        <span style="display:inline-block; width:10px; height:10px; background:#e5484d; border-radius:3px;"></span>薯饼(MEIKO)　
+        <span style="display:inline-block; width:10px; height:10px; background:#f07c1f; border-radius:3px;"></span>村民(レン)　
         <span style="display:inline-block; width:10px; height:10px; background:#4a6fd4; border-radius:3px;"></span>X(KAITO)　
         <span style="display:inline-block; width:10px; height:10px; background:#2bb3a6; border-radius:3px;"></span>=子票(初音)
     </div>
@@ -1581,6 +1589,7 @@
     function renderTicketTable() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
+        const filterMember = document.getElementById('filter-member').value;
         const keyword = document.getElementById('filter-keyword').value.trim().toLowerCase();
 
         const filtered = venueTickets.filter(t => {
@@ -1591,6 +1600,11 @@
                 matchesStatus = t.status === filterStatus;
             }
 
+            let matchesMember = true;
+            if (filterMember !== 'ALL') {
+                matchesMember = operatorOf(t) === filterMember;
+            }
+
             let matchesKW = true;
             if (keyword) {
                 matchesKW = (t.seat && t.seat.toLowerCase().includes(keyword)) ||
@@ -1598,7 +1612,23 @@
                             (t.note && t.note.toLowerCase().includes(keyword)) ||
                             (ticketNoMapById[t.id] && ticketNoMapById[t.id].toLowerCase().includes(keyword));
             }
-            return matchesStatus && matchesKW;
+            return matchesStatus && matchesMember && matchesKW;
+        });
+
+        // 自动排序：按 成员固定顺序 → 状态(在手<预定<已出) → 座位号 → 录入时间
+        const ORDER_MEMBER = { '大瓜': 0, '星黎': 1, '薯饼': 2, '村民': 3, 'X': 4, '未署名': 9 };
+        const ORDER_STATUS = { '在手': 0, '预定': 1, '已出': 2 };
+        filtered.sort((a, b) => {
+            const ma = ORDER_MEMBER[operatorOf(a)] ?? 9;
+            const mb = ORDER_MEMBER[operatorOf(b)] ?? 9;
+            if (ma !== mb) return ma - mb;
+            const sa = ORDER_STATUS[a.status] ?? 3;
+            const sb = ORDER_STATUS[b.status] ?? 3;
+            if (sa !== sb) return sa - sb;
+            const sa2 = String(a.seat || '');
+            const sb2 = String(b.seat || '');
+            if (sa2 !== sb2) return sa2 < sb2 ? -1 : 1;
+            return new Date(a.created_at) - new Date(b.created_at);
         });
 
         const tbody = document.getElementById('ticket-list-body');
