@@ -10,12 +10,13 @@
         /* 主体：左侧海报柱 + 右侧内容（宽屏才显示海报，避免手机挤压） */
         body { font-family: "Yuanti SC", "YouYuan", "Comic Sans MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f6f6f9; margin: 0; padding: 12px; color: #3c3c3c; }
         .shell { max-width: 1500px; margin: 0 auto; display: flex; gap: 16px; align-items: flex-start; }
-        .poster-col { width: 230px; flex-shrink: 0; position: sticky; top: 12px; }
-        .poster-card { border-radius: var(--radius); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 3px solid white; background: #fff; position: relative; }
+        .poster-col { width: 230px; flex-shrink: 0; position: relative; top: 0; }
+        .poster-card { border-radius: var(--radius); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 3px solid white; background: #fff; }
         .poster-card img { display: block; width: 100%; height: auto; object-fit: cover; }
         .poster-caption { padding: 8px 10px; font-size: 0.78rem; color: #888; text-align: center; background: linear-gradient(180deg,#fff,#fff4f8); }
-        /* 对话气泡：浮在海报右侧 */
-        #miku-bubble { position: absolute; left: calc(100% + 10px); top: 40px; width: 270px; z-index: 800; }
+        /* 对话气泡：浮在海报右侧（放在 poster-col 内，不裁切） */
+        #miku-bubble { position: absolute; left: calc(100% + 10px); top: 30px; width: 260px; z-index: 800; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.7; }
+        #miku-bubble .bubble-tail { position:absolute; top:16px; left:-7px; width:0; height:0; border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:8px solid #fff; }
         .container { flex: 1; min-width: 0; }
         /* 窄屏：隐藏海报栏，回归单列 */
         @media (max-width: 1000px) { .poster-col { display: none; } .shell { display: block; } }
@@ -168,14 +169,14 @@
         <div class="poster-card" id="miku-poster" onclick="mikuTalk()" style="cursor:pointer;" title="和初音说话♪">
             <img src="1.JPG" alt="初音ミク">
             <div class="poster-caption">✧ 初音ミク Magical Mirai 2027 ✧</div>
-            <!-- 对话气泡：默认隐藏，点海报/进入页面时出现 -->
-            <div id="miku-bubble" style="display:none; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.7;">
-                <div style="position:absolute; top:14px; left:-7px; width:0; height:0; border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:8px solid #fff;"></div>
-                <div id="miku-bubble-text">♪ 你好呀！想和我聊聊天吗？</div>
-                <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:10px;">
-                    <button onclick="mikuTalk()" style="border:1px solid #ffc2d9; background:#fff; color:#b3527f; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">再聊一句♪</button>
-                    <button onclick="closeMikuBubble()" style="border:1px solid #ccc; background:#fff; color:#999; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">关闭</button>
-                </div>
+        </div>
+        <!-- 对话气泡：默认隐藏，点海报/进入页面时出现（放在卡片外避免裁切） -->
+        <div id="miku-bubble" style="display:none;">
+            <div class="bubble-tail"></div>
+            <div id="miku-bubble-text">♪ 你好呀！想和我聊聊天吗？</div>
+            <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:10px;">
+                <button onclick="mikuTalk()" style="border:1px solid #ffc2d9; background:#fff; color:#b3527f; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">再聊一句♪</button>
+                <button onclick="closeMikuBubble()" style="border:1px solid #ccc; background:#fff; color:#999; border-radius:999px; padding:2px 12px; font-size:0.72rem; cursor:pointer;">关闭</button>
             </div>
         </div>
     </div>
@@ -2550,20 +2551,21 @@
     function closeModal() { document.getElementById('seatModal').style.display = 'none'; }
 
     // ===== 💬 初音小对话（点海报说话） =====
+    // 台词带点"术力口味"：39(Thank You)、语气词、DECO*27 式轻快感与歌词氛围（化用不照搬）
     const MIKU_LINES = [
-        '♪ 你好呀！今天也想和我聊聊天吗？',
-        '🎤 欢迎回来！今天的票票整理得怎么样啦？',
-        '🎵 小心别录重了位置哦，39 (Thank You)！',
-        '💚 票票有秩序，大家才开心！有需要就点成员卡片看看～',
-        '✨ Magical Mirai 2027，一起期待那天的到来吧！',
-        '🎀 录完票记得检查状态哦：在手 / 预定 / 已出～',
-        '🍬 别忘了备注里写写定金和面交时间哦！',
-        '📋 想找某张票？列表上面可以按人、按状态筛选～',
-        '📜 每张票都有历史档案，改了什么都能查～',
-        '↔️ 票要转给朋友？点「转」就好，还能拆母票子票呢～',
-        '🧹 觉得乱？用筛选功能聚焦一个人，清爽多啦～',
-        '💤 辛苦啦，累了就休息一下，票票不会跑掉的！',
-        '🌸 祝大家都能顺利收到想要的票！またね～'
+        '♪ 你好呀！今天也想和我一起，把票票的世界整理得闪闪发亮吗？',
+        '🎤 欢迎回来！もう一回、来一起数票票吧～',
+        '🎵 小心别录重了位置哦，39 (Thank You)！今日もね、ちゃんとできるよ。',
+        '💚 愛言葉は 39！票票整整齐齐，就是给全团最棒的歌～',
+        '✨ 世界は私の鏡？いや、这个看板是我们的舞台～ Magical Mirai 2027 见！',
+        '🎀 录完票记得检查状态哦：在手 / 预定 / 已出，まるで三拍子的歌～',
+        '🍬 别忘了在备注里写写定金和面交时间，記憶のカケラ、留好它～',
+        '📋 想找某张票？按人按状态筛选，迷子のチケットもすぐ見つかるよ♪',
+        '📜 每张票都有历史档案，改了什么都能查～ 記憶は嘘をつかない、安心して。',
+        '↔️ 票要转给朋友？点「转」就好，还能拆母票子票——恋のトランスファーだね♡',
+        '🧹 觉得乱？用筛选聚焦一个人，ミスだらけの画面もクリアにしよう～',
+        '💤 辛苦啦，累了就休息——少し休んで、また歌おうね。',
+        '🌸 祝大家都能顺利收到想要的票！また、どこかで会えるよね？じゃあね～'
     ];
     let mikuLineIdx = -1;
     function mikuTalk() {
