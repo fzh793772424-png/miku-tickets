@@ -102,10 +102,10 @@
         .stage { background: linear-gradient(120deg,#a17fe0,#ff8fb3); color: white; text-align: center; padding: 10px; font-size: 1.1rem; font-weight: bold; border-radius: var(--radius); margin-bottom: 15px; letter-spacing: 2px; box-shadow: 0 3px 12px rgba(255,143,179,0.3); }
         .map-section { background: white; padding: 20px; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(255,143,179,0.12); overflow-x: auto; border: 1px solid #ffe9f1; }
         
-        .block-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 12px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 74px; min-height: 44px; display:flex; align-items:center; justify-content:center; position: relative; }
+        .block-row { display: flex; gap: 8px; justify-content: flex-start; margin-bottom: 10px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+        .block-box { border: 1px solid #f0c9d8; background: #fffdfe; border-radius: 12px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all 0.2s; min-width: 74px; min-height: 44px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; position: relative; }
         .block-box:hover { border-color: var(--miku-pink); box-shadow: 0 4px 14px rgba(255,143,179,0.4); transform: translateY(-2px) rotate(-1deg); }
-        .block-title { font-weight: bold; font-size: 0.95rem; }
+        .block-title { font-weight: bold; font-size: 0.95rem; white-space: nowrap; }
         
         .block-badge { position: absolute; top: -8px; right: -8px; background: linear-gradient(120deg,#ff8fb3,#b388eb); color: white; font-size: 0.72rem; border-radius: 10px; padding: 2px 7px; font-weight: bold; border: 1px solid white; }
 
