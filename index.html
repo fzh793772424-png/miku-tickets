@@ -14,9 +14,9 @@
         .poster-card { border-radius: var(--radius); overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 3px solid white; background: #fff; }
         .poster-card img { display: block; width: 100%; height: auto; object-fit: cover; }
         .poster-caption { padding: 8px 10px; font-size: 0.78rem; color: #888; text-align: center; background: linear-gradient(180deg,#fff,#fff4f8); }
-        /* 对话气泡：浮在海报右侧（放在 poster-col 内，不裁切） */
-        #miku-bubble { position: absolute; left: calc(100% + 10px); top: 30px; width: 260px; z-index: 800; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.7; }
-        #miku-bubble .bubble-tail { position:absolute; top:16px; left:-7px; width:0; height:0; border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:8px solid #fff; }
+        /* 对话气泡：显示在海报正下方（不遮挡右侧内容） */
+        #miku-bubble { position: absolute; left: 0; right: 0; top: calc(100% + 8px); width: auto; z-index: 800; background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); border:1px solid #ffe0ec; font-size:0.85rem; color:#4a4a4a; line-height:1.7; }
+        #miku-bubble .bubble-tail { position:absolute; top:-7px; left:26px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid #fff; }
         #miku-bubble .miku-chip { border:1px solid #d8f0ec; background:#f3fcfb; color:#0f7d74; border-radius:999px; padding:3px 10px; font-size:0.72rem; cursor:pointer; transition:all .15s; }
         #miku-bubble .miku-chip:hover { background:#ffe3ee; border-color:#ffc2d9; color:#b3527f; transform: translateY(-1px); }
         #miku-bubble #miku-mood { font-size:1.3rem; }
