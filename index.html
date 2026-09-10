@@ -190,6 +190,7 @@
             *, *::before, *::after { animation: none !important; transition: none !important; }
         }
     </style>
+    <link rel="stylesheet" href="workflow.css">
 </head>
 <body>
 
@@ -229,7 +230,7 @@
     </div>
 
     <header>
-        <h2>⚡ Magical Mirai 2027 精细座位交互看板</h2>
+        <h2>团队票务工作台</h2>
         <div class="header-right">
             <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接…</span>
             <span id="action-status" role="status" aria-live="polite"></span>
@@ -301,8 +302,8 @@
             <span id="operator-email" style="font-size:0.8rem; color:#999;"></span>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
-            <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
+            <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制筛选结果</button>
+            <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出筛选结果</button>
             <button class="btn-action" onclick="downloadBackup()">💾 备份票据与历史</button>
             <button class="danger-btn" id="btn-clear-venue" style="display:none;" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
             <button class="danger-btn" id="btn-clear-all" style="display:none; background:#6a1b9a; border:none; color:white;" onclick="clearAllTickets()">🧨 彻底清空全部（含记录）</button>
@@ -384,21 +385,27 @@
                     <option value="已出">已出</option>
                     <option value="UNASSIGNED">仅看待分配</option>
                 </select>
-                <input type="text" id="filter-keyword" oninput="renderTicketTable()" placeholder="搜索座位/买家..." style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;">
+                <input type="text" id="filter-keyword" oninput="renderTicketTable()" placeholder="搜索票号、买家或备注" aria-label="搜索票据" style="padding:4px 8px; font-size:0.85rem; border:1px solid #ccc; border-radius:4px;">
             </div>
+        </div>
+        <div class="filter-shortcuts">
+            <button id="filter-mine" aria-pressed="false" onclick="quickFilter('mine')">只看我的票</button>
+            <button id="filter-unassigned" aria-pressed="false" onclick="quickFilter('unassigned')">待分配</button>
+            <button onclick="quickFilter('reset')">清除筛选</button>
+            <span id="filter-summary" role="status" aria-live="polite"></span>
         </div>
         <div class="table-scroll">
         <table class="ticket-table">
             <thead>
                 <tr>
                     <th>票据编号</th>
-                    <th>区域 (Block 直接修改)</th>
+                    <th>区域</th>
                     <th>票源 / 类型</th>
-                    <th>座位号 (单人: 10列8番 · 2连: 5列8番,5列9番，用英文逗号)</th>
+                    <th>座位</th>
                     <th>状态</th>
-                    <th>买家 (直接修改)</th>
-                    <th>价格 (可改)</th>
-                    <th>📝 备注 (点一下可写)</th>
+                    <th>买家</th>
+                    <th>价格</th>
+                    <th>备注</th>
                     <th>操作</th>
                     <th>历史</th>
                 </tr>
@@ -440,7 +447,7 @@
     </div>
 
     <div class="log-box">
-        <h3>📖 实时操作日志 (全员同步)</h3>
+        <h3>📖 实时操作日志 · 全员同步 <small style="font-size:13px;color:#617d86;">日本时间</small></h3>
         <div id="log-list" class="log-list"></div>
     </div>
 </div>
@@ -505,6 +512,22 @@
         </div>
     </div>
 </div>
+
+<dialog id="memo-dialog" class="memo-dialog" aria-labelledby="memo-title" oncancel="if (memoSaving) event.preventDefault();">
+    <form onsubmit="event.preventDefault(); saveTicketMemo();">
+        <h3 id="memo-title">票据备注</h3>
+        <p id="memo-ticket-label"></p>
+        <label for="memo-text">定金、面交时间和其他约定</label>
+        <textarea id="memo-text" placeholder="例如：已收定金 300 元&#10;9 月 15 日，车站面交" onkeydown="if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); this.form.requestSubmit(); }"></textarea>
+        <p id="memo-error" role="alert"></p>
+        <p>支持换行；Ctrl / ⌘ + Enter 保存。清空内容后保存可移除备注。</p>
+        <footer>
+            <button id="memo-cancel" type="button" class="tab-btn" onclick="if (!memoSaving) document.getElementById('memo-dialog').close()">取消</button>
+            <button id="memo-save" type="submit" class="btn-action">保存备注</button>
+        </footer>
+    </form>
+</dialog>
+<div id="board-toast" class="board-toast" role="status" aria-live="polite"></div>
 
 <script>
     const SUPABASE_URL = 'https://matckyhwzjwmdazpqzgx.supabase.co';
@@ -1093,11 +1116,11 @@
     // 权限规则：谁能管理这张票？
     // - 管理员(isAdmin) 可以动任何票（配合"彻底清空"）
     // - 普通成员只能动【自己名下】的票
-    // - 没署名/未知归属的旧票：允许任何已登录成员修正（否则无人能改）
+    // - 未署名或归属不明确的旧票由管理员处理，与数据库权限一致。
     function canManageTicket(t) {
         if (isAdmin) return true;
         const owner = operatorOf(t) || '';
-        if (!owner || owner === '未知' || owner === '未署名') return true;
+        if (!owner || owner === '未知' || owner === '未署名') return false;
         return owner === operatorName;
     }
 
@@ -1544,7 +1567,7 @@
                     <span style="color:#00897b; white-space:nowrap; font-weight:bold;">${esc(l.operator)}</span>
                     <span style="flex:1;">
                         <span style="color:#00796b;">${esc(l.action)}</span>：${esc(l.detail)}
-                        <div style="color:#bbb; font-size:0.75rem;">${new Date(l.created_at).toLocaleString('zh-CN')}</div>
+                        <div style="color:#bbb; font-size:0.75rem;">${TicketBoardUtils.formatLogDate(l.created_at)}（日本时间）</div>
                     </span>
                 </div>`).join('');
         } catch (e) {
@@ -1607,11 +1630,11 @@
             updatedNote = updatedNote.replace(/\[BY:[^\]]*\]/, `[原属:${fromName || '未知'}][BY:${toName}]`);
         }
 
-        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', t.id);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, t, { note: updatedNote });
         if (error) { alert('转票失败：' + error.message); return; }
 
         await addLog('转票', `将 ${ticketDesc(t)} 转给 ${toName}`, t.id);
-        alert(`✅ 已把票转给 ${toName}！`);
+        showToast(`已把票转给 ${toName}`);
         closeTransferModal();
         fetchTickets();
     }
@@ -1638,11 +1661,11 @@
         updatedNote = updatedNote.replace(/BY:[^\]]+/, `BY:${orig}`);
         updatedNote = updatedNote.replace(/\[原属:[^\]]*\]/, '');
 
-        const { error } = await _supabase.from('tickets').update({ note: updatedNote }).eq('id', t.id);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, t, { note: updatedNote });
         if (error) { alert('退回失败：' + error.message); return; }
 
         await addLog('退回票据', `将 ${ticketDesc(t)} 退回给原主 ${orig}`, t.id);
-        alert(`⬅️ 已把票退回给 ${orig}！`);
+        showToast(`已把票退回给 ${orig}`);
         fetchTickets();
     }
 
@@ -1659,6 +1682,9 @@
 
         const seats = seatListOf(t);
         const isUnassigned = !seats.length || String(t.seat).trim() === '待分配';
+        if (!(t.note || '').includes('[2连番]') || (!isUnassigned && seats.length !== 2)) {
+            alert('这张票不是完整的双人连票，请先核对票型和座位。'); return;
+        }
         if (seats.length > 2) { alert('⚠️ 目前仅支持拆 2连票（两个座位）。'); return; }
         if (grpOf(t)) { alert('这张票已经是拆分过的单张，请用「合并」或先合并回 2连。'); return; }
 
@@ -1729,6 +1755,16 @@
         if (!mate) { alert('没找到同组的另一半（可能已被删除或转走）。'); return; }
         if (!assertCanManage(mate)) { alert('同组的另一半不在你可管理范围（可能已转给他人）。'); return; }
 
+        const mismatch = [
+            ['场馆', t.show, mate.show], ['区域', parseBlockFromNote(t.note), parseBlockFromNote(mate.note)],
+            ['持有人', operatorOf(t), operatorOf(mate)], ['状态', t.status, mate.status],
+            ['买家', t.buyer || '', mate.buyer || ''], ['备注', t.memo || '', mate.memo || ''],
+            ['原持有人', originalOwnerOf(t), originalOwnerOf(mate)]
+        ].filter(([, a, b]) => a !== b).map(([label]) => label);
+        if (mismatch.length) {
+            alert('暂不能合并：两张票的' + mismatch.join('、') + '不同。请先核对并统一，避免丢失信息。'); return;
+        }
+
         const seatsA = seatListOf(t), seatsB = seatListOf(mate);
         const allSeats = [...seatsA, ...seatsB];
         if (allSeats.length > 2) { alert('这两张合并会超过 2 连，请检查数据。'); return; }
@@ -1736,6 +1772,9 @@
 
         // 价格相加
         const p1 = parseTicketPrice(t.price), p2 = parseTicketPrice(mate.price);
+        if (!!p1 !== !!p2 || (p1 && p2 && p1.cur !== p2.cur)) {
+            alert('暂不能合并：请先补齐两张票的价格并统一币种。'); return;
+        }
         let combinedPrice = '';
         if (p1 && p2 && p1.cur === p2.cur) combinedPrice = buildPriceStr(p1.cur, p1.amt + p2.amt);
 
@@ -1836,12 +1875,22 @@
         });
     }
 
-    function renderTicketTable() {
-        if (pendingTicketWrites || ticketTableIsEditing()) {
-            ticketTableRenderPending = true;
-            return;
+    function quickFilter(mode) {
+        if (mode === 'mine') {
+            document.getElementById('filter-member').value = document.getElementById('filter-member').value === operatorName ? 'ALL' : operatorName;
+        } else if (mode === 'unassigned') {
+            const filter = document.getElementById('filter-status');
+            filter.value = filter.value === 'UNASSIGNED' ? 'ALL' : 'UNASSIGNED';
+        } else {
+            document.getElementById('filter-member').value = 'ALL';
+            document.getElementById('filter-status').value = 'ALL';
+            document.getElementById('filter-keyword').value = '';
         }
-        ticketTableRenderPending = false;
+        renderTicketTable();
+        highlightActiveMemberCard();
+    }
+
+    function getVisibleTickets() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
         const filterMember = document.getElementById('filter-member').value;
@@ -1891,6 +1940,20 @@
             return new Date(a.created_at) - new Date(b.created_at);
         });
 
+        return filtered;
+    }
+
+    function renderTicketTable() {
+        if (pendingTicketWrites || ticketTableIsEditing()) {
+            ticketTableRenderPending = true;
+            return;
+        }
+        ticketTableRenderPending = false;
+        const filtered = getVisibleTickets();
+        const summary = document.getElementById('filter-summary');
+        if (summary) summary.textContent = `当前 ${filtered.length} 组 · ${filtered.reduce((n, t) => n + getSingleTicketCount(t), 0)} 张（复制、导出按此筛选）`;
+        document.getElementById('filter-mine')?.setAttribute('aria-pressed', String(document.getElementById('filter-member').value === operatorName));
+        document.getElementById('filter-unassigned')?.setAttribute('aria-pressed', String(document.getElementById('filter-status').value === 'UNASSIGNED'));
         const tbody = document.getElementById('ticket-list-body');
         const blockKeys = getBlockKeys();
 
@@ -1972,9 +2035,9 @@
                 // 备注（便利贴）：点击单元格直接编辑；悬停看全文
                 const memoText = t.memo || '';
                 const memoCell = `
-                    <td onclick="editTicketMemo('${t.id}')" title="${memoText ? esc(memoText) : '点击添加备注（如：已收定金 / 面交时间）'}"
-                        style="cursor:pointer; max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${memoText ? '#8a4a66' : '#bbb'}; font-size:0.78rem; border-radius:6px;">
-                        ${memoText ? '📌 ' + esc(memoText.length > 14 ? memoText.slice(0,14) + '…' : memoText) : '✎ 点此写备注'}
+                    <td title="${esc(memoText || '添加定金、面交时间等备注')}">
+                        <button class="memo-edit-button" onclick="editTicketMemo('${t.id}')" ${canM ? '' : 'disabled'}
+                          aria-label="${esc(ticketNo)}的备注">${memoText ? '📌 ' + esc(memoText.length > 28 ? memoText.slice(0,28) + '…' : memoText) : '＋ 添加备注'}</button>
                     </td>
                 `;
 
@@ -2018,25 +2081,54 @@
         });
     }
 
-    // 编辑备注（便利贴）
-    async function editTicketMemo(ticketId) {
-        const operator = getAuthenticatedOperator();
-        if (!operator) return;
+    let memoEditingTicket = null;
+    let memoSaving = false;
+    let toastTimer;
+    function showToast(message) {
+        const toast = document.getElementById('board-toast');
+        toast.textContent = message;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { toast.textContent = ''; }, 4500);
+    }
 
+    function editTicketMemo(ticketId) {
+        if (!getAuthenticatedOperator()) return;
         const target = findTicketById(ticketId);
-        if (!target) { alert('未找到该票据记录，请刷新后重试'); return; }
-        if (!assertCanManage(target)) return;
+        if (!target || !assertCanManage(target)) return;
+        memoEditingTicket = { ...target };
+        document.getElementById('memo-ticket-label').textContent = ticketDesc(target);
+        document.getElementById('memo-text').value = target.memo || '';
+        document.getElementById('memo-error').textContent = '';
+        document.getElementById('memo-dialog').showModal();
+        document.getElementById('memo-text').focus();
+    }
 
-        const cur = target.memo || '';
-        const val = prompt('📝 给这张票写备注（可留空清除）\n例如：已收定金300 / 7月15日梅田站面交', cur);
-        if (val === null) return;
-
-        const { error } = await _supabase.from('tickets').update({ memo: val.trim() }).eq('id', ticketId);
-        if (error) alert('备注保存失败：' + error.message);
-        else {
-            const t2 = findTicketById(ticketId);
-            await addLog('修改备注', `给 ${ticketDesc(t2 || target)} 写备注: ${val.trim() || '（清空）'}`, ticketId);
-            fetchTickets();
+    async function saveTicketMemo() {
+        if (!memoEditingTicket || memoSaving) return;
+        const target = memoEditingTicket;
+        const memo = document.getElementById('memo-text').value.trim();
+        const button = document.getElementById('memo-save');
+        const dialog = document.getElementById('memo-dialog');
+        memoSaving = true;
+        button.disabled = true;
+        document.getElementById('memo-cancel').disabled = true;
+        button.textContent = '正在保存…';
+        document.getElementById('memo-error').textContent = '';
+        try {
+            const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, target, { memo });
+            if (error) {
+                document.getElementById('memo-error').textContent = '未保存：' + error.message + ' 当前输入已保留，可先复制。';
+                return;
+            }
+            await addLog('修改备注', `给 ${ticketDesc(target)} 写备注: ${memo || '（清空）'}`, target.id);
+            dialog.close();
+            showToast('备注已保存');
+            await fetchTickets();
+        } finally {
+            memoSaving = false;
+            button.disabled = false;
+            document.getElementById('memo-cancel').disabled = false;
+            button.textContent = '保存备注';
         }
     }
 
@@ -2053,7 +2145,7 @@
         const rawAmt = String(amt == null ? '' : amt).trim();
         const amtVal = rawAmt ? rawAmt : defaultAmount(cur);
         const price = buildPriceStr(cur, amtVal);
-        const { error } = await _supabase.from('tickets').update({ price: price }).eq('id', ticketId);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, target, { price: price });
         if (error) alert('价格更新失败：' + error.message);
         else {
             const t2 = findTicketById(ticketId);
@@ -2106,7 +2198,7 @@
             return;
         }
         const uniqKey = seatDedupKey(currentVenue, finalBlock, newSeatValue);
-        const { error } = await _supabase.from('tickets').update({ seat: String(newSeatValue).trim(), note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, target, { seat: String(newSeatValue).trim(), note: updatedNote, uniq_key: uniqKey });
         if (error) {
             if (/duplicate|uniq_key/i.test(error.message)) alert('⚠️ 这个座位已经有票了（可能别人刚改/录），请刷新看看！');
             else alert('更新失败：' + error.message);
@@ -2144,7 +2236,7 @@
             return;
         }
         const uniqKey = seatDedupKey(currentVenue, newBlock, seatOfTicket);
-        const { error } = await _supabase.from('tickets').update({ note: updatedNote, uniq_key: uniqKey }).eq('id', ticketId);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, target, { note: updatedNote, uniq_key: uniqKey });
         if (error) {
             if (/duplicate|uniq_key/i.test(error.message)) alert('⚠️ 该区域+座位已经有票了（可能别人刚改），请刷新看看！');
             else alert('修改Block失败：' + error.message);
@@ -2167,7 +2259,7 @@
         const updateData = {};
         updateData[field] = String(value).trim();
 
-        const { error } = await _supabase.from('tickets').update(updateData).eq('id', ticketId);
+        const { error } = await TicketBoardUtils.updateTicketChecked(_supabase, target, updateData);
         if (error) alert('更新失败：' + error.message);
         else {
             const t2 = findTicketById(ticketId);
@@ -2443,7 +2535,7 @@
     }
 
     function copyTextSummary() {
-        const venueTickets = allTickets.filter(t => t.show === currentVenue);
+        const venueTickets = getVisibleTickets();
         
         let inHandCount = 0;
         let reservedCount = 0;
@@ -2458,7 +2550,7 @@
 
         const unassigned = venueTickets.filter(t => !t.seat || t.seat.includes('待分配') || (t.note && t.note.includes('BLOCK:UNASSIGNED'))).length;
 
-        let txt = `🎫 【Magical Mirai 2027 - ${currentVenue} 票据实时汇总】\n`;
+        let txt = `🎫 【Magical Mirai 2027 - ${currentVenue} 票据筛选汇总】\n`;
         txt += `------------------------------------\n`;
         txt += `📊 总记录数：${venueTickets.length} 组 | 待出票/待分配：${unassigned} 组\n`;
         txt += `🟢 在手：${inHandCount} 张 | 🟠 预定：${reservedCount} 张 | 🔴 已出：${soldCount} 张\n\n`;
@@ -2473,7 +2565,7 @@
             txt += `${i+1}. [${t.status}] ${blockCode} ${t.seat || '待分配'} (${t.buyer || '无买家'}) ${t.price ? '[' + formatTicketPrice(t.price) + ']' : ''}\n`;
         });
 
-        navigator.clipboard.writeText(txt).then(() => alert('✅ 汇总文案已成功复制到剪贴板！'))
+        navigator.clipboard.writeText(txt).then(() => showToast('筛选结果已复制'))
             .catch(() => alert('❌ 复制失败，请手动选择文本复制。'));
     }
 
@@ -2482,8 +2574,8 @@
     }
 
     function exportToCSV() {
-        const venueTickets = allTickets.filter(t => t.show === currentVenue);
-        if (venueTickets.length === 0) { alert('当前场馆无数据可导出！'); return; }
+        const venueTickets = getVisibleTickets();
+        if (venueTickets.length === 0) { alert('当前筛选没有票据可导出。'); return; }
 
         let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,系统标记,手写备注\n';
         venueTickets.forEach(t => {
@@ -2621,7 +2713,7 @@
             if (data) {
                 document.getElementById('log-list').innerHTML = data.map(l => `
                     <div style="padding:3px 0; border-bottom:1px solid #f0f0f0;">
-                        <span style="color:#888;">[${new Date(l.created_at).toLocaleTimeString('zh-CN')}]</span>
+                        <span style="color:#888;">[${TicketBoardUtils.formatLogDate(l.created_at)}]</span>
                         <strong style="color:#00796b;">${esc(l.operator)}</strong> 
                         <span>${esc(l.action)}</span>: ${esc(l.detail)}
                     </div>
@@ -2776,7 +2868,7 @@
         'doTransferTicket', 'returnTicket', 'splitTicket', 'mergeTicket', 'clearAllTickets',
         'clearCurrentVenueTickets', 'downloadBackup'].forEach(name => guardTicketAction(name, true));
     ['updateTicketField', 'updateTicketPrice', 'updateTicketSeatAuto', 'updateTicketBlock',
-        'editTicketMemo'].forEach(name => guardTicketAction(name, false));
+        'saveTicketMemo'].forEach(name => guardTicketAction(name, false));
 
     init();
 </script>
