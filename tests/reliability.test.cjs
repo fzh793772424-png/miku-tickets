@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const utils = require('../board-utils.js');
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
@@ -36,7 +37,7 @@ function board(overrides = {}) {
 test('inline JavaScript parses and local script/image/audio references exist', () => {
     scripts.forEach(script => new vm.Script(script));
     for (const [, reference] of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
-        if (!/^https?:/.test(reference)) assert.ok(fs.existsSync(path.join(__dirname, '..', reference)), reference);
+        if (!/^https?:/.test(reference)) assert.ok(fs.existsSync(path.join(__dirname, '..', reference.split('?')[0])), reference);
     }
 });
 
@@ -201,4 +202,35 @@ test('memo draft stays in the dialog when a save conflicts', async () => {
     assert.equal(b.document.getElementById('memo-text').value, '保留我的多行备注\n面交');
     assert.match(b.document.getElementById('memo-error').textContent, /已被修改/);
     assert.equal(b.document.getElementById('memo-save').disabled, false);
+});
+
+test('asset URLs are versioned by their current contents', () => {
+    for (const name of ['board-utils.js', 'workflow.css']) {
+        const digest = crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, '..', name))).digest('hex').slice(0, 12);
+        assert.ok(html.includes(`${name}?v=${digest}`), `${name} version must change when its content changes`);
+    }
+});
+
+test('logs render full dates even with the previous cached helper', async () => {
+    const b = board({ formatLogDate: undefined });
+    b.run(`_supabase.from = () => ({ select() { return this; }, order() { return this; },
+        async limit() { return { data: [{created_at:'2026-09-10T16:05:08Z',operator:'X',action:'备注',detail:'测试'}], error:null }; }
+    });`);
+    await b.run('fetchLogs()');
+    const output = b.document.getElementById('log-list').innerHTML;
+    assert.match(output, /2026\/09\/11.*01:05:08/);
+    assert.match(output, /测试/);
+    assert.doesNotMatch(output, /日志加载失败/);
+});
+
+test('log request failures show an escaped error and retry action', async () => {
+    const b = board();
+    b.context.console = { error() {} };
+    b.run(`_supabase.from = () => ({ select() { return this; }, order() { return this; },
+        async limit() { return { error: {message:'network <unavailable>'} }; }
+    });`);
+    await b.run('fetchLogs()');
+    const output = b.document.getElementById('log-list').innerHTML;
+    assert.match(output, /network &lt;unavailable&gt;/);
+    assert.match(output, /重试加载/);
 });

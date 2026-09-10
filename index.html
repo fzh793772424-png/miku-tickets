@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magical Mirai 2027 精细座位交互看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="board-utils.js"></script>
+    <script src="board-utils.js?v=904bba37e701"></script>
     <style>
         :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-pink-soft: #ffe3ee; --miku-lav: #b39dff; --bg: #fafafa; --radius: 14px; }
         /* 主体：左侧海报柱 + 右侧内容（宽屏才显示海报，避免手机挤压） */
@@ -190,7 +190,7 @@
             *, *::before, *::after { animation: none !important; transition: none !important; }
         }
     </style>
-    <link rel="stylesheet" href="workflow.css">
+    <link rel="stylesheet" href="workflow.css?v=ee669c669ee7">
 </head>
 <body>
 
@@ -1567,7 +1567,7 @@
                     <span style="color:#00897b; white-space:nowrap; font-weight:bold;">${esc(l.operator)}</span>
                     <span style="flex:1;">
                         <span style="color:#00796b;">${esc(l.action)}</span>：${esc(l.detail)}
-                        <div style="color:#bbb; font-size:0.75rem;">${TicketBoardUtils.formatLogDate(l.created_at)}（日本时间）</div>
+                        <div style="color:#bbb; font-size:0.75rem;">${formatBoardLogDate(l.created_at)}（日本时间）</div>
                     </span>
                 </div>`).join('');
         } catch (e) {
@@ -2706,6 +2706,17 @@
         }
     }
 
+    // A cached older helper must not prevent already-fetched logs from rendering.
+    function formatBoardLogDate(value) {
+        if (typeof TicketBoardUtils.formatLogDate === 'function') return TicketBoardUtils.formatLogDate(value);
+        const date = new Date(value);
+        if (!value || Number.isNaN(date.getTime())) return '时间未知';
+        return date.toLocaleString('zh-CN', {
+            timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+        });
+    }
+
     async function fetchLogs() {
         try {
             const { data, error } = await _supabase.from('ticket_logs').select('*').order('created_at', { ascending: false }).limit(20);
@@ -2713,14 +2724,15 @@
             if (data) {
                 document.getElementById('log-list').innerHTML = data.map(l => `
                     <div style="padding:3px 0; border-bottom:1px solid #f0f0f0;">
-                        <span style="color:#888;">[${TicketBoardUtils.formatLogDate(l.created_at)}]</span>
+                        <span style="color:#888;">[${formatBoardLogDate(l.created_at)}]</span>
                         <strong style="color:#00796b;">${esc(l.operator)}</strong> 
                         <span>${esc(l.action)}</span>: ${esc(l.detail)}
                     </div>
-                `).join('');
+                `).join('') || '<div style="color:#617d86;">暂无操作记录</div>';
             }
         } catch (e) {
-            document.getElementById('log-list').innerHTML = '<div style="color:#e71d36;">日志加载失败</div>';
+            console.error('日志加载失败:', e);
+            document.getElementById('log-list').innerHTML = `<div style="color:#b43350;">日志加载失败：${esc(e.message || '请检查网络后重试')}</div><button class="btn-action" onclick="fetchLogs()" style="margin-top:8px;">重试加载</button>`;
         }
     }
 
