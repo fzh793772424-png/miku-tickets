@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magical Mirai 2027 精细座位交互看板</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="board-utils.js"></script>
     <style>
         :root { --miku: #39C5BB; --miku-dark: #00897b; --miku-pink: #ff8fb3; --miku-pink-soft: #ffe3ee; --miku-lav: #b39dff; --bg: #fafafa; --radius: 14px; }
         /* 主体：左侧海报柱 + 右侧内容（宽屏才显示海报，避免手机挤压） */
@@ -162,6 +163,32 @@
         .note-bounce { display: inline-block; animation: miku-note 1.2s ease-in-out infinite; }
         .note-bounce:nth-child(2) { animation-delay: 0.15s; }
         .note-bounce:nth-child(3) { animation-delay: 0.3s; }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        button:disabled { opacity: 0.55; cursor: wait; }
+        button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #00796b; outline-offset: 2px; }
+        #action-status { color: #00695c; font-size: 0.85rem; }
+        @media (max-width: 720px) {
+            .table-scroll .ticket-table { min-width: 0; }
+            .ticket-table, .ticket-table tbody { display: block; width: 100%; }
+            .ticket-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+            .ticket-table tr { display: block; margin: 0 0 14px; border: 1px solid #f0d3de; border-radius: 12px; overflow: hidden; }
+            .ticket-table td { display: grid; grid-template-columns: 82px minmax(0, 1fr); align-items: center; gap: 8px; text-align: left; padding: 8px 10px; font-size: 0.875rem; }
+            .ticket-table td::before { content: attr(data-label); color: #85516a; font-size: 0.8rem; }
+            .ticket-table td:first-child { background: #f0faf9; white-space: normal; }
+            .ticket-table td[colspan] { display: block; }
+            .ticket-table td[colspan]::before { content: none; }
+            .ticket-table td[data-label="备注"] { max-width: none !important; white-space: normal !important; overflow-wrap: anywhere; }
+            .ticket-table td[data-label="操作"] { white-space: normal !important; }
+            .ticket-table td[data-label="操作"] .ticket-cell-value { display: flex; flex-wrap: wrap; gap: 6px; }
+            .ticket-cell-value { min-width: 0; overflow-wrap: anywhere; }
+            .ticket-table input, .ticket-table select { max-width: 100%; min-width: 0; min-height: 40px; font-size: 16px !important; }
+            .ticket-table button { min-height: 40px; font-size: 0.875rem !important; }
+            .table-input { width: 100%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -205,6 +232,7 @@
         <h2>⚡ Magical Mirai 2027 精细座位交互看板</h2>
         <div class="header-right">
             <span id="sync-status" style="font-size: 0.85rem; color:#888;">⏳ 正在连接…</span>
+            <span id="action-status" role="status" aria-live="polite"></span>
             <span id="user-chip" style="font-size:0.85rem; font-weight:bold; color:#00897b; background:#e6f7f5; padding:4px 12px; border-radius:20px; border:1px solid #c9eeea;">未登录</span>
             <button class="btn-action" id="btn-logout" style="background:#5c6bc0; display:none;" onclick="authLogout()">🚪 退出登录</button>
         </div>
@@ -275,7 +303,8 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button class="btn-action" onclick="copyTextSummary()" style="background:#5c6bc0;">📋 复制群文本</button>
             <button class="btn-action" onclick="exportToCSV()" style="background:#43a047;">📊 导出 CSV</button>
-            <button class="danger-btn" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
+            <button class="btn-action" onclick="downloadBackup()">💾 备份票据与历史</button>
+            <button class="danger-btn" id="btn-clear-venue" style="display:none;" onclick="clearCurrentVenueTickets()">🗑️ 清空当前场馆</button>
             <button class="danger-btn" id="btn-clear-all" style="display:none; background:#6a1b9a; border:none; color:white;" onclick="clearAllTickets()">🧨 彻底清空全部（含记录）</button>
         </div>
     </div>
@@ -604,6 +633,7 @@
             document.getElementById('user-chip').innerText = '未登录';
             document.getElementById('btn-logout').style.display = 'none';
             document.getElementById('btn-clear-all').style.display = 'none';
+            document.getElementById('btn-clear-venue').style.display = 'none';
             document.getElementById('auth-overlay').style.display = 'flex';
             showAuthTab('login');
             return;
@@ -621,6 +651,7 @@
             document.getElementById('user-chip').innerText = '👤 ' + operatorName;
             document.getElementById('btn-logout').style.display = 'inline-block';
             document.getElementById('btn-clear-all').style.display = isAdmin ? 'inline-block' : 'none';
+            document.getElementById('btn-clear-venue').style.display = isAdmin ? 'inline-block' : 'none';
             initBoard();
         } else {
             // 账号还没认领名字 → 强制走认领页
@@ -816,7 +847,7 @@
         fetchLogs();
         if (window.innerWidth > 1000) mikuAutoSay();   // 桌面端进来看板时自动打招呼
 
-        _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchTickets())
+        _supabase.channel('tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, scheduleTicketRefresh)
             .subscribe((status) => { if (status === 'SUBSCRIBED') setSyncStatus(true); else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setSyncStatus(false); });
         _supabase.channel('logs').on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_logs' }, () => fetchLogs())
             .subscribe((status) => { if (status !== 'SUBSCRIBED' && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')) setSyncStatus(false); });
@@ -1159,11 +1190,11 @@
         if (!show || !block || block === 'UNASSIGNED') return null;
         const s = String(seatText == null ? '' : seatText).trim();
         if (!s || s === '待分配') return null;
-        const seatParts = s.split(',').map(x => x.trim()).filter(Boolean);
+        const seatParts = s.split(/[,，]/).map(x => x.trim()).filter(Boolean);
         for (let part of seatParts) {
             const found = allTickets.find(t =>
                 t.show === show &&
-                t.note && t.note.includes(`BLOCK:${block}`) &&
+                parseBlockFromNote(t.note) === block &&
                 String(t.id) !== String(excludeTicketId) &&
                 seatListOf(t).includes(part)
             );
@@ -1181,20 +1212,40 @@
         return `${no}｜${t.show || ''} ${blockStr} ${t.seat || '待分配'}`;
     }
 
+    let ticketFetchVersion = 0;
+    let ticketRefreshTimer;
+    let pendingTicketWrites = 0;
+    let ticketTableRenderPending = false;
+
+    function scheduleTicketRefresh() {
+        clearTimeout(ticketRefreshTimer);
+        ticketRefreshTimer = setTimeout(fetchTickets, 150);
+    }
+
+    function ticketTableIsEditing() {
+        const tbody = document.getElementById('ticket-list-body');
+        const active = document.activeElement;
+        return !!(tbody && active && tbody.contains(active) && active.matches('input, select, textarea'));
+    }
+
+    function flushTicketTable() {
+        if (ticketTableRenderPending && !pendingTicketWrites && !ticketTableIsEditing()) renderTicketTable();
+    }
+
+    document.addEventListener('focusout', () => setTimeout(flushTicketTable, 0));
+
     async function fetchTickets() {
+        const version = ++ticketFetchVersion;
         try {
-            const { data, error } = await _supabase
-                .from('tickets')
-                .select('*')
-                .order('created_at', { ascending: true });
-            if (error) throw error;
+            const data = await TicketBoardUtils.readAllRows(_supabase, 'tickets');
+            if (version !== ticketFetchVersion) return;
             if (data) {
-                allTickets = data;
+                allTickets = data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
                 rebuildTicketNoMap();
                 updateStatsAndHighlights();
             }
         } catch (e) {
-            setSyncStatus(false, '🔴 票据数据加载失败，请检查网络或刷新');
+            if (version === ticketFetchVersion) setSyncStatus(false, '🔴 票据数据加载失败，请检查网络或刷新');
         }
     }
 
@@ -1786,6 +1837,11 @@
     }
 
     function renderTicketTable() {
+        if (pendingTicketWrites || ticketTableIsEditing()) {
+            ticketTableRenderPending = true;
+            return;
+        }
+        ticketTableRenderPending = false;
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         const filterStatus = document.getElementById('filter-status').value;
         const filterMember = document.getElementById('filter-member').value;
@@ -1808,6 +1864,7 @@
             if (keyword) {
                 matchesKW = (t.seat && t.seat.toLowerCase().includes(keyword)) ||
                             (t.buyer && t.buyer.toLowerCase().includes(keyword)) ||
+                            (t.memo && t.memo.toLowerCase().includes(keyword)) ||
                             (t.note && t.note.toLowerCase().includes(keyword)) ||
                             (ticketNoMapById[t.id] && ticketNoMapById[t.id].toLowerCase().includes(keyword));
             }
@@ -1922,7 +1979,7 @@
                 `;
 
                 return `
-                    <tr>
+                    <tr data-ticket-id="${esc(t.id)}">
                         <td>${ticketNoHtml}${transferBadge}</td>
                         <td>${blockSelectHtml}</td>
                         <td>${source} / ${typeDisplay}</td>
@@ -1945,6 +2002,20 @@
                 `;
             }).join('');
         }
+        const labels = ['票据编号', '区域', '票源 / 类型', '座位', '状态', '买家', '价格', '备注', '操作', '历史'];
+        tbody.querySelectorAll('tr[data-ticket-id]').forEach(row => {
+            Array.from(row.children).forEach((cell, index) => {
+                cell.dataset.label = labels[index];
+                const content = document.createElement('div');
+                content.className = 'ticket-cell-value';
+                while (cell.firstChild) content.appendChild(cell.firstChild);
+                cell.appendChild(content);
+            });
+            const ticket = findTicketById(row.dataset.ticketId);
+            if (ticket && !canManageTicket(ticket)) {
+                row.querySelectorAll('input, select').forEach(input => { input.disabled = true; });
+            }
+        });
     }
 
     // 编辑备注（便利贴）
@@ -2122,7 +2193,7 @@
         const price = buildPriceStr(currency, priceInput ? priceInput : comboAmount(currency, qty));
 
         if (seat !== '待分配' && block !== 'UNASSIGNED') {
-            const existing = getTicket(currentVenue, block, seat);
+            const existing = findOccupant(currentVenue, block, seat, null);
             if (existing) {
                 alert(`⚠️ 录入失败：【${block} Block ${seat}】已经被分配给买家 [${existing.buyer || '未填写'}] (${existing.status})！`);
                 return;
@@ -2140,8 +2211,8 @@
             note: `[BLOCK:${block}][${source}][${type}][BY:${operator}]`
         }]).select('id');
         if (error) {
-            if (/uniq_key|column .*uniq_key.* does not exist/i.test(error.message)) {
-                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请先在 Supabase SQL Editor 运行建列 SQL，再录入。');
+            if (/column .*uniq_key.* does not exist|could not find .*uniq_key.*column/i.test(error.message)) {
+                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请联系管理员检查配置后再录入。');
             } else if (/duplicate|uniq_key/i.test(error.message)) {
                 alert('⚠️ 这个位置的票已经存在了！请刷新页面看看（可能是别人刚录的）。');
             } else {
@@ -2237,7 +2308,7 @@
 
     // 精确匹配：一条记录里的座位拆开后逐个比对，杜绝 "5番" 误配 "15番"
     function getTicket(show, block, seatStr) {
-        return allTickets.find(t => t.show === show && t.note && t.note.includes(`BLOCK:${block}`) && seatListOf(t).includes(seatStr));
+        return allTickets.find(t => t.show === show && parseBlockFromNote(t.note) === block && seatListOf(t).includes(seatStr));
     }
 
     function toggleSeatSelect(seatStr, el) {
@@ -2321,8 +2392,8 @@
             note: `[BLOCK:${currentBlock}][本土票][${typeStr}][BY:${operator}]`
         }]).select('id');
         if (error) {
-            if (/uniq_key|column .*uniq_key.* does not exist/i.test(error.message)) {
-                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请先在 Supabase SQL Editor 运行建列 SQL，再保存。');
+            if (/column .*uniq_key.* does not exist|could not find .*uniq_key.*column/i.test(error.message)) {
+                alert('⚠️ 云端还没启用去重（uniq_key 列不存在）。请联系管理员检查配置后再保存。');
             } else if (/duplicate|uniq_key/i.test(error.message)) {
                 alert('⚠️ 这些座位已经有票了（可能别人刚录）！请刷新后再看。');
             } else {
@@ -2407,47 +2478,48 @@
     }
 
     function csvCell(v) {
-        return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        return TicketBoardUtils.csvCell(v);
     }
 
     function exportToCSV() {
         const venueTickets = allTickets.filter(t => t.show === currentVenue);
         if (venueTickets.length === 0) { alert('当前场馆无数据可导出！'); return; }
 
-        let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,备注\n';
+        let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,系统标记,手写备注\n';
         venueTickets.forEach(t => {
             let blockCode = '待分配';
             if (t.note && t.note.includes('BLOCK:')) {
                 const match = t.note.match(/BLOCK:([^\]]+)/);
                 if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
             }
-            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', formatTicketPrice(t.price), t.note || ''].map(csvCell).join(',') + '\n';
+            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', formatTicketPrice(t.price), t.note || '', t.memo || ''].map(csvCell).join(',') + '\n';
         });
 
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${currentVenue}_座位数据_${new Date().toLocaleDateString('zh-CN')}.csv`;
-        link.click();
+        TicketBoardUtils.downloadFile(csv, 'text/csv;charset=utf-8;', `${currentVenue}_座位数据_${new Date().toISOString().slice(0, 10)}.csv`);
     }
 
-    // 下载一份全量备份 CSV（所有场馆 + 操作记录）到本地
-    function downloadBackup() {
-        const venueTickets = allTickets.slice();
-        let csv = '\uFEFF场馆,Block,座位号,状态,买家,价格,备注\n';
-        venueTickets.forEach(t => {
-            let blockCode = '待分配';
-            if (t.note && t.note.includes('BLOCK:')) {
-                const match = t.note.match(/BLOCK:([^\]]+)/);
-                if (match && match[1] !== 'UNASSIGNED') blockCode = match[1];
-            }
-            csv += [t.show, blockCode, t.seat || '待分配', t.status, t.buyer || '', formatTicketPrice(t.price), t.note || ''].map(csvCell).join(',') + '\n';
-        });
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `全量备份_所有场馆_${new Date().toLocaleString('zh-CN').replace(/[/: ]/g, '-')}.csv`;
-        link.click();
+    // 保留当前账号可读取的票据、日志的所有字段；不含账号密码，也不是数据库快照。
+    async function downloadBackup() {
+        if (!getAuthenticatedOperator()) return false;
+        try {
+            const startedAt = new Date().toISOString();
+            const [tickets, ticketLogs] = await Promise.all([
+                TicketBoardUtils.readAllRows(_supabase, 'tickets'),
+                TicketBoardUtils.readAllRows(_supabase, 'ticket_logs')
+            ]);
+            const backup = {
+                format: 'miku-tickets-backup', version: 1,
+                scope: 'current-user-visible-rows', started_at: startedAt,
+                exported_at: new Date().toISOString(),
+                tickets, ticket_logs: ticketLogs
+            };
+            TicketBoardUtils.downloadFile(JSON.stringify(backup, null, 2), 'application/json;charset=utf-8;',
+                `票据与历史备份_${startedAt.replace(/[:.]/g, '-')}.json`);
+            return true;
+        } catch (error) {
+            alert('备份失败，没有生成备份文件：' + error.message);
+            return false;
+        }
     }
 
     // 🧨 彻底清空全部（含操作记录）—— 仅管理员（is_admin）可用，需二次输密码验证
@@ -2476,7 +2548,7 @@
 
         // 第二步：自动下载备份
         if (confirm('✅ 密码验证通过。\n\n是否先自动下载一份全量备份文件（以防误操作）？')) {
-            downloadBackup();
+            if (!await downloadBackup()) return;
             alert('📥 备份已开始下载，请确认文件保存成功后再继续。');
         }
 
@@ -2489,7 +2561,7 @@
         const { error: e2 } = await _supabase.from('ticket_logs').delete().neq('id', 0);
         if (e2) { alert('清空操作记录失败：' + e2.message); return; }
 
-        alert(`✅ 已彻底清空全部票据与操作记录！\n（如已下载备份，可从备份恢复）`);
+        alert(`✅ 已彻底清空全部票据与操作记录！\n（请妥善保留备份文件；恢复需由管理员处理）`);
         fetchTickets();
         fetchLogs();
     }
@@ -2497,6 +2569,7 @@
     async function clearCurrentVenueTickets() {
         const operator = getAuthenticatedOperator();
         if (!operator) return;
+        if (!isAdmin) { alert('⛔ 仅管理员可清空整个场馆。'); return; }
 
         const count = allTickets.filter(t => t.show === currentVenue).length;
         if (count === 0) { alert('当前场馆没有数据，无需清空。'); return; }
@@ -2674,12 +2747,43 @@
         if (bubble) bubble.style.display = 'none';
     }
 
+    // Keep repeat clicks from issuing duplicate requests; never redraw an active edit mid-save.
+    const activeTicketActions = new Set();
+    function guardTicketAction(name, preventRepeat) {
+        const original = window[name];
+        window[name] = async function (...args) {
+            const key = name + ':' + (args[0] == null ? '' : args[0]);
+            if (preventRepeat && activeTicketActions.has(key)) return;
+            if (preventRepeat) activeTicketActions.add(key);
+            pendingTicketWrites++;
+            const status = document.getElementById('action-status');
+            if (status) status.textContent = '正在处理，请稍候…';
+            const buttons = preventRepeat ? Array.from(document.querySelectorAll('button[onclick]'))
+                .filter(button => button.getAttribute('onclick').startsWith(name + '(') && !button.disabled) : [];
+            buttons.forEach(button => { button.disabled = true; });
+            try { return await original.apply(this, args); }
+            catch (error) { alert('操作未能完成，请刷新核对数据后重试：' + error.message); }
+            finally {
+                pendingTicketWrites--;
+                if (preventRepeat) activeTicketActions.delete(key);
+                buttons.forEach(button => { button.disabled = false; });
+                if (status && !pendingTicketWrites) status.textContent = '';
+                flushTicketTable();
+            }
+        };
+    }
+    ['addQuickTicket', 'saveSeatTicketsMulti', 'deleteSeatTicketsMulti', 'deleteSingleTicket',
+        'doTransferTicket', 'returnTicket', 'splitTicket', 'mergeTicket', 'clearAllTickets',
+        'clearCurrentVenueTickets', 'downloadBackup'].forEach(name => guardTicketAction(name, true));
+    ['updateTicketField', 'updateTicketPrice', 'updateTicketSeatAuto', 'updateTicketBlock',
+        'editTicketMemo'].forEach(name => guardTicketAction(name, false));
+
     init();
 </script>
 
 <!-- 🎵 BGM 悬浮播放按钮 -->
 <audio id="bgm-audio" loop preload="none">
-    <source src="music/bgm.mp3" type="audio/mpeg">
+    <source src="bgm.mp3" type="audio/mpeg">
 </audio>
 <button id="bgm-btn" title="播放/暂停背景音乐"
     style="position:fixed; right:16px; bottom:16px; z-index:3000; width:52px; height:52px; border-radius:50%; border:none; cursor:pointer; font-size:1.4rem; background:linear-gradient(135deg,#39c5bb,#b388eb); color:#fff; box-shadow:0 4px 14px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center;">
@@ -2687,31 +2791,8 @@
 </button>
 
 <script>
-    // BGM 播放控制：默认暂停；点击切换播放/暂停，音量 30%，循环
-    (function () {
-        var audio = document.getElementById('bgm-audio');
-        var btn = document.getElementById('bgm-btn');
-        var playing = false;
-        if (audio) { audio.volume = 0.3; }
-
-        function toggleBgm() {
-            if (!audio) return;
-            if (playing) {
-                audio.pause();
-                btn.textContent = '🎵';
-                btn.style.background = 'linear-gradient(135deg,#39c5bb,#b388eb)';
-            } else {
-                audio.play().then(function () {
-                    playing = true;
-                    btn.textContent = '🎵';
-                    btn.style.background = 'linear-gradient(135deg,#ff8fb3,#ff5c9c)';
-                }).catch(function (e) {
-                    alert('无法播放音乐：' + (e && e.message ? e.message : '未知错误') + '\n（可能是音乐文件还没上传，或浏览器阻止了播放）');
-                });
-            }
-        }
-        if (btn) btn.addEventListener('click', toggleBgm);
-    })();
+    TicketBoardUtils.bindAudioButton(document.getElementById('bgm-audio'), document.getElementById('bgm-btn'),
+        error => alert('无法播放音乐：' + (error.message || '请稍后重试')));
 </script>
 </body>
 </html>
