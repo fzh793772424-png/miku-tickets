@@ -35,7 +35,7 @@ function board(overrides = {}) {
 
 test('inline JavaScript parses and local script/image/audio references exist', () => {
     scripts.forEach(script => new vm.Script(script));
-    for (const [, reference] of html.matchAll(/(?:src)="([^"#]+)"/g)) {
+    for (const [, reference] of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
         if (!/^https?:/.test(reference)) assert.ok(fs.existsSync(path.join(__dirname, '..', reference)), reference);
     }
 });
@@ -148,4 +148,57 @@ test('CSV escapes formulas, quotes and multiline notes', () => {
     assert.equal(utils.csvCell('=1+1'), '"\'=1+1"');
     assert.equal(utils.csvCell('  @SUM(1)'), '"\'  @SUM(1)"');
     assert.equal(utils.csvCell('备注"甲"\n第二行'), '"备注""甲""\n第二行"');
+});
+
+test('log dates consistently show the Japanese date across midnight', () => {
+    assert.match(utils.formatLogDate('2026-09-10T16:05:08Z'), /2026\/09\/11.*01:05:08/);
+    assert.equal(utils.formatLogDate('invalid'), '时间未知');
+    assert.equal(utils.formatLogDate(null), '时间未知');
+});
+
+test('a zero-row update is a conflict, while null fields use IS NULL', async () => {
+    const filters = [];
+    let result = { data: null, error: null };
+    const client = {
+        from() { return this; }, update() { return this; },
+        eq(...args) { filters.push(['eq', ...args]); return this; },
+        is(...args) { filters.push(['is', ...args]); return this; },
+        select() { return this; }, maybeSingle: async () => result
+    };
+    const ticket = { id: 1, note: '[BY:X]', memo: null, status: '在手' };
+    const conflict = await utils.updateTicketChecked(client, ticket, { memo: 'draft' });
+    assert.match(conflict.error.message, /已被修改/);
+    assert.ok(filters.some(([fn, key, value]) => fn === 'is' && key === 'memo' && value === null));
+    assert.ok(filters.some(([fn, key, value]) => fn === 'eq' && key === 'note' && value === '[BY:X]'));
+    result = { data: { id: 1 }, error: null };
+    assert.equal((await utils.updateTicketChecked(client, ticket, { memo: 'draft' })).error, null);
+});
+
+test('CSV and the visible table share member/status/memo filters', () => {
+    const b = board();
+    b.document.getElementById('filter-member').value = 'X';
+    b.document.getElementById('filter-status').value = '在手';
+    b.document.getElementById('filter-keyword').value = '定金';
+    b.run(`allTickets = [
+      {id:1,show:'东京场',seat:'待分配',status:'在手',memo:'定金300',note:'[BY:X]'},
+      {id:2,show:'东京场',seat:'待分配',status:'已出',memo:'定金100',note:'[BY:X]'},
+      {id:3,show:'东京场',seat:'待分配',status:'在手',memo:'定金500',note:'[BY:大瓜]'}
+    ];`);
+    assert.equal(b.run('getVisibleTickets().length'), 1);
+    b.run('exportToCSV()');
+    assert.match(b.downloads[0][0], /定金300/);
+    assert.doesNotMatch(b.downloads[0][0], /定金100|定金500/);
+});
+
+test('memo draft stays in the dialog when a save conflicts', async () => {
+    const b = board({ updateTicketChecked: async () => ({ error: new Error('已被修改') }) });
+    let closed = false;
+    b.document.getElementById('memo-dialog').close = () => { closed = true; };
+    b.document.getElementById('memo-text').value = '保留我的多行备注\n面交';
+    b.run("memoEditingTicket = {id:1,memo:''};");
+    await b.run('saveTicketMemo()');
+    assert.equal(closed, false);
+    assert.equal(b.document.getElementById('memo-text').value, '保留我的多行备注\n面交');
+    assert.match(b.document.getElementById('memo-error').textContent, /已被修改/);
+    assert.equal(b.document.getElementById('memo-save').disabled, false);
 });

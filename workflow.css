@@ -1,0 +1,98 @@
+/* Concert keepsake colors, with a quieter working surface. */
+:root { --miku: #19aeaa; --miku-dark: #087b79; --bg: #f2f7f8; --radius: 18px; }
+body { background: #f2f7f8; color: #263e48; padding: 24px; font-family: 'Segoe UI', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.55; }
+.shell { max-width: 1560px; gap: 24px; }
+.poster-col { width: 190px; top: 24px; }
+.poster-card { border: 5px solid white; border-radius: 18px; box-shadow: 0 12px 28px #19475412; transform: rotate(-1deg); }
+.poster-caption { background: white; color: #52717b; font-size: 12px; padding: 12px 4px; }
+#miku-bubble { box-shadow: 0 8px 24px #1947540d; border-color: #ddebed; }
+.miku-banner { display: flex; max-width: none; height: 168px; margin-bottom: 18px; background: #123e48; border: 0; border-radius: 22px; box-shadow: none; }
+.miku-banner img { width: 34%; height: 100%; object-fit: cover; object-position: center; }
+.miku-banner .banner-overlay { position: static; flex: 1; align-items: center; padding: 22px 28px; background: linear-gradient(115deg, #123e48, #126660); }
+.miku-banner .banner-title { font-size: clamp(1.15rem, 2vw, 1.8rem); letter-spacing: .025em; text-shadow: none; }
+.miku-banner .banner-title small { font-size: .875rem; line-height: 1.7; opacity: .8; letter-spacing: 0; margin-top: 10px; text-shadow: none; }
+header { background: white; padding: 16px 20px; border: 1px solid #e0ebed; box-shadow: none; }
+header h2 { font-size: 1rem; color: #254b56; }
+.tab-bar { gap: 8px; margin: 20px 0 14px; }
+.tab-btn { background: transparent; border: 1px solid #cddfe2; color: #41636b; padding: 10px 16px; font-size: 14px; font-weight: 600; }
+.tab-btn.active { background: #087b79; border-color: #087b79; box-shadow: 0 4px 10px #087b791c; }
+.tab-btn:hover { border-color: #19aeaa; box-shadow: none; transform: none; }
+.operator-bar, .stats-card, .quick-add-card, .ticket-list-card, .pool-card, .map-section, .log-box { background: white; border: 1px solid #dfeaec; box-shadow: 0 4px 18px #1e495006; border-radius: 18px; padding: 20px; }
+.operator-bar { gap: 14px; font-size: 14px; }
+.btn-action { background: #087b79; padding: 9px 14px; border-radius: 10px; box-shadow: none; font-size: 14px; }
+.btn-action:hover { background: #066967; box-shadow: none; transform: none; }
+.danger-btn { background: #fff4f5; border: 1px solid #efc8d1; color: #ac3857; box-shadow: none; border-radius: 10px; font-size: 14px; }
+.stats-card { gap: 12px; padding: 14px; }
+.stat-box { background: #f4faf9; border: 0; border-radius: 12px; padding: 15px 10px; color: #59757b; font-size: 13px; }
+.stat-box:nth-child(3) { background: #fff7e9; }
+.stat-box:nth-child(4) { background: #fff1f5; }
+.stat-num { font-variant-numeric: tabular-nums; font-size: 1.8rem; color: #164d54; line-height: 1.25; margin-top: 8px; }
+.quick-add-card { border-top: 3px solid #19aeaa; }
+.form-row { gap: 10px; }
+.form-row input, .form-row select, .table-input, .table-select { border: 1px solid #d6e4e7; border-radius: 8px; background: #fff; color: #254851; }
+.form-row input, .form-row select { min-height: 42px; }
+.pool-header h3 { color: #254b56; }
+.member-card { border: 1px solid #e1ebed; background: #fcfefe; border-radius: 12px; }
+.member-card:hover { box-shadow: 0 4px 12px #0f777712; transform: none; }
+.member-card .m-name { color: #246468; }
+.pool-total { background: #edf8f6; border-radius: 10px; }
+.list-header-tools { margin-bottom: 16px; gap: 12px; }
+.filter-shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.filter-shortcuts button { padding: 7px 12px; border: 1px solid #d4e4e7; border-radius: 8px; background: white; color: #315961; cursor: pointer; font-size: 14px; }
+.filter-shortcuts button[aria-pressed='true'] { background: #e3f5f1; border-color: #19aeaa; color: #006965; }
+#filter-summary { margin-left: auto; color: #617d86; font-size: 13px; }
+.table-scroll { border: 1px solid #e2ecee; border-radius: 12px; }
+.ticket-table { font-size: 14px; }
+.ticket-table th { background: #164b54; color: #fff; font-weight: 500; padding: 12px 8px; border: 0; white-space: nowrap; font-size: 13px; }
+.ticket-table td { padding: 11px 7px; border: 0; border-bottom: 1px solid #e8eff1; font-size: 14px; }
+.ticket-table tr:nth-child(even) { background: #f8fbfc; }
+.ticket-table tr:hover { background: #edf8f7; }
+.ticket-table td:first-child { min-width: 110px; }
+.ticket-table td:nth-child(3) { min-width: 90px; }
+.ticket-table td:nth-child(4) { min-width: 170px; }
+.ticket-table td:nth-child(9) { min-width: 150px; }
+.ticket-table input, .ticket-table select { min-height: 36px; font-size: 14px !important; }
+.ticket-table button { min-height: 32px; border-radius: 7px !important; font-size: 13px !important; padding: 5px 8px !important; }
+.ticket-table input:disabled, .ticket-table select:disabled { opacity: 1; color: #6a8188; border-color: transparent; background: transparent; cursor: default; }
+.memo-edit-button { background: transparent; border: 0; color: #8a4a66; cursor: pointer; max-width: 150px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.stage { background: #164b54; border-radius: 10px; box-shadow: none; font-size: 14px; letter-spacing: .25em; }
+.block-box { border-color: #d5e5e7; background: #fafdfd; border-radius: 10px; }
+.legend { color: #506e77; font-size: 13px; }
+.log-list { background: #f8fbfc; border-color: #e2ecee; }
+.modal-content { border: 1px solid #dfeaec; box-shadow: 0 20px 80px #143e4926; }
+.memo-dialog { border: 0; border-radius: 20px; width: min(520px, calc(100% - 32px)); padding: 26px; color: #244650; box-shadow: 0 24px 80px #143e4933; }
+.memo-dialog::backdrop { background: #102e4260; backdrop-filter: blur(3px); }
+.memo-dialog h3 { margin: 0 0 8px; font-size: 20px; }
+.memo-dialog p { color: #64808a; font-size: 14px; }
+.memo-dialog textarea { display: block; width: 100%; min-height: 160px; resize: vertical; padding: 12px; margin: 12px 0; border: 1px solid #cbdde2; border-radius: 10px; font: inherit; }
+.memo-dialog footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.memo-dialog footer button { min-height: 42px; padding: 8px 18px; }
+#memo-error { color: #b43350; }
+.board-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 22px; background: #164b54; color: white; border-radius: 12px; box-shadow: 0 8px 24px #164b5426; max-width: calc(100% - 40px); z-index: 6000; pointer-events: none; }
+.board-toast:empty { display: none; }
+@media (max-width: 1100px) { .poster-col { display: none; } .shell { display: block; } }
+@media (max-width: 720px) {
+  body { padding: 12px; }
+  .miku-banner { height: 130px; border-radius: 16px; }
+  .miku-banner img { width: 30%; min-height: 0; }
+  .miku-banner .banner-overlay { padding: 14px; }
+  .miku-banner .banner-title { font-size: 18px; }
+  .miku-banner .banner-title small { font-size: 12px; margin-top: 6px; }
+  header, .operator-bar, .quick-add-card, .ticket-list-card, .pool-card, .map-section, .log-box { padding: 14px; border-radius: 14px; }
+  .tab-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .tab-btn { font-size: 13px; padding: 10px 5px; }
+  .stats-card { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 8px; }
+  .stats-card .stat-box:last-child { grid-column: 1 / -1; }
+  .stat-num { font-size: 26px; }
+  .form-row > input, .form-row > select { flex: 1 1 140px; width: 100%; font-size: 16px; }
+  #filter-summary { width: 100%; margin: 4px 0 0; }
+  .table-scroll { border: 0; }
+  .ticket-table tr, .ticket-table tr:nth-child(even) { background: white; border: 1px solid #d6e5e8; border-radius: 14px; margin-bottom: 14px; }
+  .ticket-table td { grid-template-columns: 78px minmax(0, 1fr); padding: 9px 12px; min-width: 0 !important; }
+  .ticket-table td:first-child { background: #e8f6f3; padding: 14px 12px; }
+  .ticket-table td::before { color: #58767e; font-size: 13px; }
+  .ticket-table td:last-child { border-bottom: 0; }
+  .ticket-table input, .ticket-table select { font-size: 16px !important; min-height: 40px; }
+  .ticket-table button { min-height: 40px; font-size: 14px !important; }
+  .memo-edit-button { max-width: 100%; white-space: pre-wrap; }
+}

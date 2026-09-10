@@ -60,7 +60,30 @@
         sync();
     }
 
-    const api = { readAllRows, csvCell, downloadFile, bindAudioButton };
+    function formatLogDate(value) {
+        const date = new Date(value);
+        if (!value || Number.isNaN(date.getTime())) return '时间未知';
+        return new Intl.DateTimeFormat('zh-CN', {
+            timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+        }).format(date);
+    }
+
+    async function updateTicketChecked(client, ticket, changes) {
+        try {
+            let query = client.from('tickets').update(changes).eq('id', ticket.id);
+            for (const field of ['note', 'seat', 'status', 'price', 'buyer', 'memo', 'show']) {
+                if (!(field in ticket)) continue;
+                query = ticket[field] == null ? query.is(field, null) : query.eq(field, ticket[field]);
+            }
+            const { data, error } = await query.select('id').maybeSingle();
+            if (error) return { error };
+            if (!data) return { error: new Error('这张票已被修改、转走或删除，或你没有修改权限。请刷新后核对再保存。') };
+            return { data, error: null };
+        } catch (error) { return { error }; }
+    }
+
+    const api = { readAllRows, csvCell, downloadFile, bindAudioButton, formatLogDate, updateTicketChecked };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.TicketBoardUtils = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
